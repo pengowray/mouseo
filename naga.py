@@ -66,6 +66,9 @@ class Naga:
         data = self.transact(0x028c, bytes([profile, button, hypershift]), size=10)
         return pt.ButtonFunction.from_buffer_copy(data[3:10])
 
+    def set_button_function(self, button, bf, hypershift=0, profile=1):
+        self.transact(0x020c, bytes([profile, button, hypershift]) + bytes(bf))
+
 
 def describe(bf):
     try:
