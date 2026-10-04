@@ -1,8 +1,9 @@
 # Settings for naga-daemon.py.
 #
 # The mouse sends these keys (set in layout.py), and the daemon gives them their behaviour:
+#   Thumb 1  (F22)  hold + wheel: screen zoom (Super+= / Super+-).
 #   Thumb 3  (F21)  tap: Ctrl+Home.   Hold + wheel: change DPI.
-#   Thumb 8  (F13)  hold + wheel: system volume.
+#   Thumb 8  (F13)  hold + wheel: volume of the focused app.
 #   Thumb 9  (F14)  hold + wheel: Spotify volume.
 #   Thumb 12 (F15)  hold + wheel: playback speed.
 #   Thumb 11 (F16)  hold + wheel: fine playback speed.
@@ -12,8 +13,10 @@
 # Keys are evdev key names without the KEY_ prefix, joined with "+": "shift+dot", "alt+left".
 # Leave a key out of a profile to do nothing in that app.
 
-dpi_stages = [400, 600, 800, 1200, 1500]
-spotify_volume_step = 2      # percent per wheel step
+dpi_step = 50                # DPI change per wheel step (thumb 3)
+dpi_min = 200                # the notification bar is empty at dpi_min and full at dpi_max
+dpi_max = 2400
+volume_step = 2              # percent per wheel step (thumbs 8 and 9)
 
 # Which keys to send while holding thumb 11 or 12, by focused app.
 # "apps" matches part of the window's app_id, ignoring case.

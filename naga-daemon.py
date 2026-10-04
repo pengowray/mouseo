@@ -2,7 +2,7 @@
 """Linux replacement for the Windows AHK scripts used with the Razer Naga V2 HyperSpeed.
 
 Grabs the mouse's input devices, passes everything through unchanged, except while
-one of the carrier keys from layout.py (F13-F16, F21) is held: then the wheel,
+one of the carrier keys from layout.py (F13-F16, F21, F22) is held: then the wheel,
 middle click and wheel tilts do the things described in config.toml.
 """
 import asyncio, json, os, shutil, subprocess, sys, tomllib
@@ -14,8 +14,8 @@ DEVICE_NAME = 'Naga V2 HyperSpeed'
 OUR_PREFIX = 'naga-daemon'
 VERBOSE = '-v' in sys.argv
 
-F13, F14, F15, F16, F21 = e.KEY_F13, e.KEY_F14, e.KEY_F15, e.KEY_F16, e.KEY_F21
-CARRIERS = {F13, F14, F15, F16, F21}
+F13, F14, F15, F16, F21, F22 = e.KEY_F13, e.KEY_F14, e.KEY_F15, e.KEY_F16, e.KEY_F21, e.KEY_F22
+CARRIERS = {F13, F14, F15, F16, F21, F22}
 TILT_LEFT, TILT_RIGHT = e.KEY_LEFTCTRL, e.KEY_F18   # what the onboard layout sends for wheel tilt
 ALIASES = {'shift': 'leftshift', 'ctrl': 'leftctrl', 'alt': 'leftalt', 'super': 'leftmeta'}
 
@@ -28,6 +28,16 @@ def parse_combo(text):
             sys.exit(f'{CONFIG}: unknown key "{part}" in "{text}"')
         codes.append(getattr(e, name))
     return codes
+
+
+def normalize(name):
+    return ''.join(ch for ch in name.lower() if ch.isalnum())
+
+
+def bar(value, lo, hi, cells=12):
+    filled = round(cells * (value - lo) / (hi - lo)) if hi > lo else cells
+    filled = min(cells, max(1 if value > lo else 0, filled))
+    return '🟩' * filled + '⬜' * (cells - filled)
 
 
 def log(*args):
@@ -71,14 +81,15 @@ class Actions:
         self.focus = focus
         self.profiles = []
         keys = {e.KEY_LEFTCTRL, e.KEY_HOME, e.KEY_VOLUMEUP, e.KEY_VOLUMEDOWN,
-                e.KEY_PLAYPAUSE, e.KEY_PREVIOUSSONG, e.KEY_NEXTSONG}
+                e.KEY_PLAYPAUSE, e.KEY_PREVIOUSSONG, e.KEY_NEXTSONG,
+                e.KEY_LEFTMETA, e.KEY_EQUAL, e.KEY_MINUS}
         for name, p in config['profiles'].items():
             combos = {k: parse_combo(v) for k, v in p.items() if k != 'apps'}
             keys.update(c for combo in combos.values() for c in combo)
             self.profiles.append((name, [a.lower() for a in p.get('apps', [])], combos))
         self.kbd = evdev.UInput({e.EV_KEY: sorted(keys)}, name=f'{OUR_PREFIX} keys')
         self.notify_id = None
-        self.spotify_sink = None
+        self.volume_target = None
 
     def profile(self):
         app = self.focus.app_id.lower()
@@ -105,14 +116,17 @@ class Actions:
     def wheel(self, carrier, steps):
         up = steps > 0
         for _ in range(abs(steps)):
+            step = self.config['volume_step'] * (1 if up else -1)
             if carrier == F13:
-                self.tap([e.KEY_VOLUMEUP if up else e.KEY_VOLUMEDOWN])
+                self.app_volume(self.focus.app_id, step)
             elif carrier == F14:
-                self.spotify_volume(self.config['spotify_volume_step'] * (1 if up else -1))
+                self.app_volume('spotify', step)
             elif carrier == F15:
                 self.media_action('faster' if up else 'slower')
             elif carrier == F16:
                 self.media_action('faster_fine' if up else 'slower_fine')
+            elif carrier == F22:
+                self.tap([e.KEY_LEFTMETA, e.KEY_EQUAL if up else e.KEY_MINUS])  # COSMIC screen zoom
         if carrier == F21:
             self.step_dpi(1 if up else -1)
 
@@ -132,22 +146,48 @@ class Actions:
             self.tap([e.KEY_LEFTCTRL, e.KEY_HOME])
 
     def release(self, carrier):
-        self.spotify_sink = None
+        self.volume_target = None
 
-    def spotify_volume(self, percent):
-        if self.spotify_sink is None:
-            out = subprocess.run(['pactl', '-f', 'json', 'list', 'sink-inputs'],
-                                 capture_output=True, text=True).stdout or '[]'
-            for sink in json.loads(out):
-                props = sink.get('properties', {})
-                if 'spotify' in (props.get('application.name', '') + props.get('application.process.binary', '')).lower():
-                    self.spotify_sink = str(sink['index'])
-                    break
-            else:
-                self.notify('Spotify volume', 'Spotify is not playing anything')
-                self.spotify_sink = ''
-        if self.spotify_sink:
-            subprocess.run(['pactl', 'set-sink-input-volume', self.spotify_sink, f'{percent:+d}%'])
+    def app_volume(self, app_id, percent):
+        """Change the volume of every audio stream from the app, and show the new level."""
+        if self.volume_target is None:
+            self.volume_target = (app_id, self.find_streams(app_id))
+        app_id, streams = self.volume_target
+        label = app_id.rsplit('.', 1)[-1] or 'App'
+        if not streams:
+            self.notify(f'{label} volume', 'This app is not playing any sound')
+            return
+        for stream in streams:
+            subprocess.run(['pactl', 'set-sink-input-volume', stream, f'{percent:+d}%'])
+        levels = [v for s in self.list_streams() if str(s['index']) in streams
+                  for v in [self.stream_percent(s)] if v is not None]
+        if levels:
+            level = max(levels)
+            self.notify(f'{label} volume', f'{bar(level, 0, 100)}  {level}%')
+
+    @staticmethod
+    def list_streams():
+        out = subprocess.run(['pactl', '-f', 'json', 'list', 'sink-inputs'],
+                             capture_output=True, text=True).stdout
+        return json.loads(out or '[]')
+
+    @staticmethod
+    def stream_percent(stream):
+        channels = stream.get('volume', {}).values()
+        values = [int(c['value_percent'].rstrip('%')) for c in channels if 'value_percent' in c]
+        return max(values) if values else None
+
+    def find_streams(self, app_id):
+        want = normalize(app_id)
+        found = []
+        for stream in self.list_streams():
+            props = stream.get('properties', {})
+            names = {normalize(props.get(k, '')) for k in (
+                'application.name', 'application.process.binary', 'application.id',
+                'pipewire.access.portal.app_id', 'application.icon_name')}
+            if any(len(n) >= 3 and (n in want or want in n) for n in names):
+                found.append(str(stream['index']))
+        return found
 
     def step_dpi(self, direction):
         try:
@@ -156,19 +196,17 @@ class Actions:
         except Exception as err:  # OpenRazer not running, or the mouse is on Bluetooth
             self.notify('DPI', f'Cannot change DPI: {err or "mouse not found in OpenRazer"}')
             return
-        stages = sorted(self.config['dpi_stages'])
+        lo, hi, step = self.config['dpi_min'], self.config['dpi_max'], self.config['dpi_step']
         current = mouse.dpi[0]
-        if direction > 0:
-            new = next((s for s in stages if s > current), stages[-1])
-        else:
-            new = next((s for s in reversed(stages) if s < current), stages[0])
-        mouse.dpi = (new, new)
+        new = min(hi, max(lo, (current // step + direction) * step))
+        if new != current:
+            mouse.dpi = (new, new)
+        self.notify('DPI', f'{bar(new, lo, hi)}  {new}')
         if VERBOSE:
             log('dpi', current, '->', new)
-        self.notify('DPI', str(new))
 
     def notify(self, title, body):
-        cmd = ['notify-send', '--print-id', '-t', '1500', '-a', 'Naga', title, body]
+        cmd = ['notify-send', '--print-id', '-t', '1500', '-a', 'Naga', '-h', 'boolean:transient:true', title, body]
         if self.notify_id:
             cmd[2:2] = ['-r', self.notify_id]
         out = subprocess.run(cmd, capture_output=True, text=True).stdout.strip()
