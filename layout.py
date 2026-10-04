@@ -1,6 +1,6 @@
 """Onboard layout for the Naga V2 HyperSpeed, based on Synapse profile "General v5".
 
-Keys F13-F16, F19 and F24 are carriers for naga-daemon.py, which gives them the
+Keys F13-F17, F19 and F24 are carriers for naga-daemon.py, which gives them the
 behaviour the Windows AHK scripts used to provide. Everything else works with
 no software running.
 """
@@ -8,7 +8,7 @@ from qdrazer.protocol import ButtonFunction, FnDpiSwitch, FnKeyboardModifier as 
 
 # HID keyboard usages
 # F19 and F24 have no meaning in the standard keymap; F21/F22 would toggle the touchpad without the daemon.
-F13, F14, F15, F16, F18, F19, F24 = 0x68, 0x69, 0x6a, 0x6b, 0x6d, 0x6e, 0x73
+F13, F14, F15, F16, F17, F18, F19, F24 = 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x73
 ESC, HOME, END, PGUP, PGDN = 0x29, 0x4a, 0x4d, 0x4b, 0x4e
 COMMA, PERIOD, KP_ENTER = 0x36, 0x37, 0x58
 LCTRL, LALT = 0xe0, 0xe2
@@ -52,7 +52,7 @@ LAYOUT = {
     0x43: ('Thumb 4',           key(LALT, Mod.LEFT_SHIFT), media(PREV)),
     0x44: ('Thumb 5',           hyper(),                   hyper()),
     0x45: ('Thumb 6',           key(END, Mod.LEFT_CONTROL), media(NEXT)),
-    0x46: ('Thumb 7',           off(),                     key(PGUP, Mod.RIGHT_ALT)),
+    0x46: ('Thumb 7',           key(F17),                  key(PGUP, Mod.RIGHT_ALT)),  # daemon: background app volume
     0x47: ('Thumb 8',           key(F13),                  media(PLAY)),    # daemon: system volume
     0x48: ('Thumb 9',           key(F14),                  dpi(FnDpiSwitch.PREV)),  # daemon: Spotify volume
     0x49: ('Thumb 10',          key(ESC),                  key(PGDN, Mod.RIGHT_ALT)),

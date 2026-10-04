@@ -2,7 +2,7 @@
 """Linux replacement for the Windows AHK scripts used with the Razer Naga V2 HyperSpeed.
 
 Grabs the mouse's input devices, passes everything through unchanged, except while
-one of the carrier keys from layout.py (F13-F16, F19, F24) is held: then the wheel,
+one of the carrier keys from layout.py (F13-F17, F19, F24) is held: then the wheel,
 middle click and wheel tilts do the things described in config.toml.
 """
 import asyncio, json, os, shutil, subprocess, sys, threading, tomllib
@@ -15,8 +15,10 @@ DEVICE_NAME = 'Naga V2 HyperSpeed'
 OUR_PREFIX = 'naga-daemon'
 VERBOSE = '-v' in sys.argv
 
-F13, F14, F15, F16, F19, F24 = e.KEY_F13, e.KEY_F14, e.KEY_F15, e.KEY_F16, e.KEY_F19, e.KEY_F24
-CARRIERS = {F13, F14, F15, F16, F19, F24}
+F13, F14, F15, F16, F17, F19, F24 = (e.KEY_F13, e.KEY_F14, e.KEY_F15, e.KEY_F16, e.KEY_F17,
+                                     e.KEY_F19, e.KEY_F24)
+CARRIERS = {F13, F14, F15, F16, F17, F19, F24}
+APP_CARRIERS = (F13, F14, F17)   # volume and media controls for one app
 TILT_LEFT, TILT_RIGHT = e.KEY_LEFTCTRL, e.KEY_F18   # what the onboard layout sends for wheel tilt
 ALIASES = {'shift': 'leftshift', 'ctrl': 'leftctrl', 'alt': 'leftalt', 'super': 'leftmeta'}
 
@@ -146,6 +148,7 @@ class Actions:
         self.dpi = DpiWorker()
         self.dpi_shown = None
         self.volume_target = None
+        self.background_app = None
 
     def profile(self):
         app = self.focus.app_id.lower()
@@ -173,10 +176,8 @@ class Actions:
         up = steps > 0
         for _ in range(abs(steps)):
             step = self.config['volume_step'] * (1 if up else -1)
-            if carrier == F13:
-                self.app_volume(self.focus.app_id, step)
-            elif carrier == F14:
-                self.app_volume('spotify', step)
+            if carrier in APP_CARRIERS:
+                self.app_volume(self.target_app(carrier), step)
             elif carrier == F15:
                 self.media_action('faster' if up else 'slower')
             elif carrier == F16:
@@ -188,8 +189,8 @@ class Actions:
 
     # Hold + middle click or wheel tilt. Returns False if nothing is assigned, so the key passes through.
     def button(self, carrier, code):
-        if carrier in (F13, F14):
-            app = self.focus.app_id if carrier == F13 else 'spotify'
+        if carrier in APP_CARRIERS:
+            app = self.target_app(carrier)
             command = {e.BTN_MIDDLE: 'play-pause', TILT_LEFT: 'previous', TILT_RIGHT: 'next'}[code]
             player = self.find_player(app)
             if player:
@@ -202,6 +203,26 @@ class Actions:
         else:
             return False
         return True
+
+    def target_app(self, carrier):
+        if carrier == F13:
+            return self.focus.app_id
+        if carrier == F14:
+            return 'spotify'
+        if self.background_app is None:  # F17: looked up once per hold
+            self.background_app = self.find_background_app() or ''
+        return self.background_app
+
+    def find_background_app(self):
+        """An app with audio that is not focused and is not Spotify. Apps playing sound come first."""
+        skip = {normalize(self.focus.app_id), 'spotify'}
+        for stream in sorted(self.list_streams(), key=lambda s: bool(s.get('corked'))):
+            props = stream.get('properties', {})
+            name = props.get('application.process.binary') or props.get('application.name', '')
+            n = normalize(name)
+            if len(n) >= 3 and not any(n in k or k in n for k in skip if k) and 'speechdispatcher' not in normalize(props.get('application.name', '')):
+                return props.get('application.name') or name
+        return None
 
     def press(self, carrier):
         if carrier == F19:
@@ -225,13 +246,17 @@ class Actions:
 
     def release(self, carrier):
         self.volume_target = None
+        self.background_app = None
 
     def app_volume(self, app_id, percent):
         """Change the volume of every audio stream from the app, and show the new level."""
         if self.volume_target is None:
             self.volume_target = (app_id, self.find_streams(app_id))
         app_id, streams = self.volume_target
-        label = app_id.rsplit('.', 1)[-1] or 'App'
+        if not app_id:
+            self.notify('Background app volume', 'No other app is playing sound')
+            return
+        label = app_id.rsplit('.', 1)[-1]
         if not streams:
             self.notify(f'{label} volume', 'This app is not playing any sound')
             return

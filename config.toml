@@ -5,10 +5,11 @@
 #   Thumb 3  (F19)  tap: Ctrl+Home.   Hold + wheel: change DPI.
 #   Thumb 8  (F13)  hold + wheel: volume of the focused app.
 #   Thumb 9  (F14)  hold + wheel: Spotify volume.
+#   Thumb 7  (F17)  hold + wheel: volume of another app playing sound (not focused, not Spotify).
 #   Thumb 12 (F15)  hold + wheel: playback speed.
 #   Thumb 11 (F16)  hold + wheel: fine playback speed.
-# While holding thumb 8 or 9:      middle click = play/pause, tilt left/right = previous/next track,
-#                                  sent to the focused app (thumb 8) or Spotify (thumb 9).
+# While holding thumb 7, 8 or 9:   middle click = play/pause, tilt left/right = previous/next track,
+#                                  sent to the app that thumb 7, 8 or 9 controls.
 # While holding thumb 11 or 12:    middle click = play/pause, tilt left/right = seek back/forward.
 #
 # Keys are evdev key names without the KEY_ prefix, joined with "+": "shift+dot", "alt+left".
