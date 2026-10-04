@@ -2,6 +2,11 @@
 
 Onboard button layout for a Razer Naga V2 HyperSpeed, written from Linux without Synapse.
 
+> [!WARNING]
+> This is my personal mouse setup, not indended as a general utility.
+
+# about
+
 The layout is stored in the mouse, so it works on any computer. A few buttons send spare
 F-keys (F13-F17, F19, F24) that the `naga-daemon` user service turns into app volume,
 playback speed, DPI, screen zoom and push to talk. The daemon and its settings are in the
