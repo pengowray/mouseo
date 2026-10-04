@@ -73,8 +73,11 @@ play_pause = "playpause"
 # monitor-night-light also sets these presets at 22:30 and 06:00.
 
 [monitors.304NTJJ4A468]      # LG ULTRAGEAR, DP-1
+# Warm 1 is the User 1 setting monitor-night-light uses at night (it sets these gains at 22:30).
 colour_presets = [
-    { value = 0x0b, name = "User 1 (night)" },
+    { value = 0x0b, name = "Warm 3", gains = [50, 32, 12] },
+    { value = 0x0b, name = "Warm 2", gains = [50, 37, 20] },
+    { value = 0x0b, name = "Warm 1 (night)", gains = [50, 42, 28] },
     { value = 0x05, name = "6500 K" },
     { value = 0x08, name = "9300 K" },
 ]
