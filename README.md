@@ -7,9 +7,11 @@ F-keys (F13-F17, F19, F24) that the `naga-daemon` user service turns into app vo
 playback speed, DPI, screen zoom and push to talk. The daemon and its settings are in the
 chezmoi dotfiles, not here:
 
-- `~/.local/bin/naga-daemon`
+- `~/.local/share/naga-daemon/naga_daemon/` (the code; `~/.local/bin/naga-daemon` starts it)
 - `~/.config/naga/config.toml` (per-app keys, DPI step, volume step)
 - `~/.config/systemd/user/naga-daemon.service`
+
+Its tests: `cd ~/.local/share/naga-daemon && python3 -m unittest discover -s tests -t .`
 
 Setup steps that need sudo (OpenRazer, cos-cli, udev rule) are in the dotfiles'
 `install-essentials.sh`.
@@ -22,6 +24,7 @@ Setup steps that need sudo (OpenRazer, cos-cli, udev rule) are in the dotfiles'
 | `apply.py` | Shows how the mouse differs from `layout.py`. `--write` writes and verifies. |
 | `probe.py` | Prints every button assignment the mouse reports. Read-only. |
 | `backup.py` | Saves the raw assignments to a JSON file. |
+| `test_top_buttons.py` | For a minute, shows a notification when either top button is pressed. |
 | `naga.py` | Talks to the mouse over hidraw feature reports. |
 | `vendor/razerqdhid` | Protocol library by geezmolycos (MIT), cloned, not committed. |
 
