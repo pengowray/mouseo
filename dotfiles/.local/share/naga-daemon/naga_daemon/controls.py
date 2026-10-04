@@ -103,6 +103,35 @@ class ZoomControl(Control):
         self.ctx.output.tap([e.KEY_LEFTMETA, e.KEY_EQUAL if up else e.KEY_MINUS])
 
 
+class WindowControl(Control):
+    """Tap: Ctrl+End. Hold + tilt right / left: keep the focused window on top or stop.
+
+    COSMIC has no "always on top", so this uses sticky: the window floats above the others
+    and shows on every workspace.
+    """
+
+    TAP = [e.KEY_LEFTCTRL, e.KEY_END]
+
+    def __init__(self, ctx):
+        self.ctx = ctx
+
+    def tap(self):
+        self.ctx.output.tap(self.TAP)
+
+    def button(self, code):
+        if code not in (TILT_LEFT, TILT_RIGHT):
+            return False
+        threading.Thread(target=self._set, args=(code == TILT_RIGHT,), daemon=True).start()
+        return True
+
+    def _set(self, on):
+        app = self.ctx.focus.set_sticky(on)
+        if not app:
+            self.ctx.notifier.show('Always on top', 'No window is focused')
+        else:
+            self.ctx.notifier.show('Always on top', f'{"On" if on else "Off"}: {app_label(app)}')
+
+
 class DpiControl(Control):
     """Hold + wheel: DPI in fixed steps, shown at once and sent in the background. Tap: calls `on_tap`."""
 

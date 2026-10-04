@@ -3,12 +3,13 @@ from types import SimpleNamespace
 import evdev
 from evdev import ecodes as e
 from . import audio, players, keys
-from .controls import AppControl, SpeedControl, ZoomControl, DpiControl, MonitorControl, MEDIA_KEYS
+from .controls import AppControl, SpeedControl, ZoomControl, DpiControl, MonitorControl, WindowControl, MEDIA_KEYS
 from .dpi import DpiWorker
 from .focus import Focus
 from .monitors import MonitorWorker
 from .notify import Notifier
 from .output import Output
+from .pie import PieControl, PieUI, VOLUME_KEYS
 from .profiles import Profiles
 from .router import Router
 
@@ -18,10 +19,15 @@ CONFIG = os.environ.get('NAGA_CONFIG') or os.path.expanduser('~/.config/naga/con
 
 def build(config, focus):
     profiles = Profiles(config['profiles'])
-    output = Output(profiles.keys() | set(MEDIA_KEYS.values()) | set(ZoomControl.KEYS))
+    output = Output(profiles.keys() | set(MEDIA_KEYS.values()) | set(ZoomControl.KEYS)
+                    | set(VOLUME_KEYS) | set(WindowControl.TAP))
     ctx = SimpleNamespace(focus=focus, profiles=profiles, output=output, notifier=Notifier())
     step = config['volume_step']
+    pie_ui = PieUI()
+    pie_ui.start()
     controls = {
+        keys.PIE: PieControl(ctx, pie_ui, step),
+        keys.WINDOW: WindowControl(ctx),
         keys.FOCUSED_APP: AppControl(ctx, lambda: focus.app_id, step, ('App volume', 'No window is focused')),
         keys.SPOTIFY: AppControl(ctx, lambda: 'spotify', step),
         keys.BACKGROUND_APP: AppControl(

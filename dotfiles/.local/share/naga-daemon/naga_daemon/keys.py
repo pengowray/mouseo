@@ -13,6 +13,8 @@ FINE_SPEED = e.KEY_F16       # thumb 11
 DPI = e.KEY_F19              # thumb 2
 ZOOM = e.KEY_F24             # thumb 1
 MONITOR = e.KEY_RO           # thumb 4. Japanese Ro key: no meaning in a US layout, and F20-F23 mute the mic or toggle the touchpad
+PIE = e.KEY_HENKAN           # thumb 5. Japanese Henkan key, also meaningless in a US layout
+WINDOW = e.KEY_MUHENKAN      # thumb 6. Japanese Muhenkan key
 
 # Buttons that a held carrier can redirect
 MIDDLE = e.BTN_MIDDLE

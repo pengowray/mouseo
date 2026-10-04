@@ -5,6 +5,8 @@ from .util import normalize, names_match
 
 NAME_PROPERTIES = ('application.name', 'application.process.binary', 'application.id',
                    'pipewire.access.portal.app_id', 'application.icon_name')
+ICON_PROPERTIES = ('application.icon_name', 'pipewire.access.portal.app_id', 'application.id',
+                   'application.name', 'application.process.binary')
 
 
 @dataclass
@@ -14,6 +16,7 @@ class Stream:
     names: set          # normalized names to match an app against
     corked: bool        # paused
     percent: int | None
+    icons: tuple = ()   # icon names to try, best first
 
     def belongs_to(self, app):
         want = normalize(app)
@@ -33,7 +36,8 @@ def list_streams():
             app=props.get('application.name') or props.get('application.process.binary', ''),
             names={n for n in names if len(n) >= 3},
             corked=bool(s.get('corked')),
-            percent=max(percents) if percents else None))
+            percent=max(percents) if percents else None,
+            icons=tuple(props[k] for k in ICON_PROPERTIES if props.get(k))))
     return streams
 
 
@@ -70,3 +74,10 @@ def change_volume(indexes, percent):
 def volume_of(indexes):
     levels = [s.percent for s in list_streams() if s.index in indexes and s.percent is not None]
     return max(levels) if levels else None
+
+
+def system_volume():
+    """The default output's volume in percent, or None."""
+    out = subprocess.run(['pactl', 'get-sink-volume', '@DEFAULT_SINK@'], capture_output=True, text=True).stdout
+    percents = [int(part.rstrip('%')) for part in out.split() if part.endswith('%') and part[:-1].isdigit()]
+    return max(percents) if percents else None

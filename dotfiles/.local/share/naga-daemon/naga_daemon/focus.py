@@ -44,6 +44,23 @@ class Focus:
             log.warning('cos-cli info failed: %s', err)
         return ''
 
+    @staticmethod
+    def set_sticky(on):
+        """Make the focused window sticky (on all workspaces, above other windows) or not.
+
+        Returns the window's app_id, or '' if no window is focused.
+        """
+        try:
+            out = subprocess.run([COS_CLI, 'info', '--json'], capture_output=True, text=True, timeout=2).stdout
+            for app in json.loads(out).get('apps', []):
+                if 'activated' in app.get('state', []):
+                    subprocess.run([COS_CLI, 'state', '-i', str(app['index']), '--sticky' if on else '--unsticky'],
+                                   capture_output=True, timeout=2)
+                    return app.get('app_id', '')
+        except (OSError, ValueError, KeyError, subprocess.TimeoutExpired) as err:
+            log.warning('cos-cli state failed: %s', err)
+        return ''
+
     def update(self, msg):
         """Handle an `info` reply or a `state_change` notification."""
         state = msg.get('result') or (msg.get('params') or {}).get('state') or {}

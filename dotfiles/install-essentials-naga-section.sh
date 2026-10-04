@@ -1,16 +1,16 @@
 # --- Razer Naga V2 HyperSpeed: OpenRazer, Polychromatic, naga-daemon ------------------
 # The mouse's onboard button layout is written with ~/projects/mouseo. The tracked
 # naga-daemon user service gives its extra keys their behaviour (app volume, playback speed,
-# DPI, push to talk). It needs python3-evdev, playerctl, OpenRazer (for DPI) and cos-cli (to
-# follow the focused window). plugdev lets the daemon read the mouse (takes effect at next
-# login). uinput access comes from steam-devices, above.
+# DPI, push to talk, volume pie). It needs python3-evdev, playerctl, gtk-layer-shell (to draw
+# the volume pie), OpenRazer (for DPI) and cos-cli (to follow the focused window). plugdev
+# lets the daemon read the mouse (takes effect at next login). uinput access comes from steam-devices, above.
 for ppa in openrazer polychromatic; do
   if ! ls /etc/apt/sources.list.d/ | grep -q "^$ppa-"; then
     log "Adding $ppa PPA"
     sudo add-apt-repository -y "ppa:$ppa/stable"
   fi
 done
-NAGA_PKGS=(openrazer-meta polychromatic python3-evdev python3-dbus playerctl)
+NAGA_PKGS=(openrazer-meta polychromatic python3-evdev python3-dbus playerctl gir1.2-gtklayershell-0.1)
 NAGA_MISSING=()
 for p in "${NAGA_PKGS[@]}"; do pkg_installed "$p" || NAGA_MISSING+=("$p"); done
 if [ ${#NAGA_MISSING[@]} -gt 0 ]; then
