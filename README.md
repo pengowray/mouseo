@@ -24,6 +24,8 @@ Setup steps that need sudo (OpenRazer, cos-cli, udev rule) are in the dotfiles'
 | `apply.py` | Shows how the mouse differs from `layout.py`. `--write` writes and verifies. |
 | `probe.py` | Prints every button assignment the mouse reports. Read-only. |
 | `backup.py` | Saves the raw assignments to a JSON file. |
+| `sync-dotfiles.sh` | Copies the daemon's installed files into `dotfiles/`, for reference. |
+| `dotfiles/` | That copy. Edit the chezmoi repo, not these. |
 | `test_top_buttons.py` | For a minute, shows a notification when either top button is pressed. |
 | `naga.py` | Talks to the mouse over hidraw feature reports. |
 | `vendor/razerqdhid` | Protocol library by geezmolycos (MIT), cloned, not committed. |
@@ -64,3 +66,23 @@ Only works through the USB receiver (product id `00b4`), not Bluetooth.
 | Thumb 12 | hold: playback speed, seek | `>` |
 
 Push to talk reaches apps as mouse button 12 (Discord shows it as MOUSE12).
+
+## What the mouse supports
+
+Tested through the receiver with the razerqdhid commands (2026-10-04, firmware 1.1):
+
+| Command | Works |
+|---|---|
+| Button functions, normal and Hyper layer (`0x020c` / `0x028c`) | yes |
+| Serial, firmware, device mode | yes |
+| Profiles: count and list (`0x058a`, `0x0580`) | yes, 1 profile |
+| Polling rate, DPI, DPI stages | yes |
+| Battery level (`0x0780`), idle time (`0x0783`) | yes |
+| Sensor lift (`0x0b8b`) | yes |
+| Scroll mode, scroll acceleration, smart reel | not supported |
+| LED effect and brightness | not supported |
+| Flash usage, macro list and count | not supported |
+
+Button ids: left/right/middle `0x01`-`0x03`, wheel up/down `0x09`/`0x0a`, top buttons
+`0x0b` (front) / `0x0c` (behind it), tilt left/right `0x34`/`0x35`, thumb grid 1-12 `0x40`-`0x4b`.
+The control channel is the 90-byte feature report on USB interface 0, transaction id `0x1f`.

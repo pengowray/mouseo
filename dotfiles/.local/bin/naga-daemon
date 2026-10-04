@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+"""Razer Naga extra buttons. The code is in ~/.local/share/naga-daemon/naga_daemon."""
+import os, sys
+sys.path.insert(0, os.path.expanduser('~/.local/share/naga-daemon'))
+from naga_daemon.__main__ import run
+run()
