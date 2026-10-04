@@ -4,7 +4,7 @@ A control gets press() when its button goes down, wheel(up) per wheel step, butt
 middle click or a tilt (return True to swallow it), tap() if released without doing anything,
 and release() when the button comes up.
 """
-import logging
+import logging, threading
 from evdev import ecodes as e
 from . import audio, players
 from .monitors import BRIGHTNESS, COLOUR_PRESET
@@ -143,15 +143,24 @@ class MonitorControl(Control):
     def __init__(self, ctx, worker, step, presets):
         self.ctx, self.worker, self.step, self.presets = ctx, worker, step, presets
         self.monitor = None
+        self.located = threading.Event()
 
     def press(self):
-        self.monitor = self.worker.find(self.ctx.focus.output)
+        """Find the focused window's monitor in the background, so the input thread doesn't wait."""
+        self.monitor = None
+        self.located.clear()
+        threading.Thread(target=self._locate, daemon=True).start()
+
+    def _locate(self):
+        output = self.ctx.focus.query_output() or self.ctx.focus.output
+        self.monitor = self.worker.find(output)
+        log.debug('monitor for output %r: %s', output, self.monitor and self.monitor.model)
         if self.monitor:
             self.worker.refresh(self.monitor)
+        self.located.set()
 
     def ready(self):
-        if self.monitor is None:
-            self.monitor = self.worker.find(self.ctx.focus.output)
+        self.located.wait(0.5)  # usually done before the first wheel step
         if self.monitor is None:
             self.ctx.notifier.show('Monitor', 'Still looking for monitors')
         return self.monitor

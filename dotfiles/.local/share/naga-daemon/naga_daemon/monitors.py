@@ -88,8 +88,10 @@ class MonitorWorker(threading.Thread):
                 self._ddcutil(bus, 'setvcp', f'{feature:x}', str(value), '--noverify')
             for bus in to_read:
                 monitor = next(m for m in self.monitors if m.bus == bus)
-                out = self._ddcutil(bus, 'getvcp', f'{BRIGHTNESS:x}', f'{COLOUR_PRESET:x}', '--brief')
-                for feature, value in parse_getvcp(out).items():
+                values = parse_getvcp(self._ddcutil(bus, 'getvcp', f'{BRIGHTNESS:x}', f'{COLOUR_PRESET:x}', '--brief'))
+                for missing in {BRIGHTNESS, COLOUR_PRESET} - set(values):  # reads fail now and then; retry once
+                    values.update(parse_getvcp(self._ddcutil(bus, 'getvcp', f'{missing:x}', '--brief')))
+                for feature, value in values.items():
                     if (bus, feature) not in self.pending:  # don't undo a change made while reading
                         monitor.values[feature] = value
 
