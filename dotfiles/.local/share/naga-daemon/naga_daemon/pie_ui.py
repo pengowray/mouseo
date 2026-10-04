@@ -67,7 +67,7 @@ class Pie:
         GtkLayerShell.set_layer(w, GtkLayerShell.Layer.OVERLAY)
         GtkLayerShell.set_monitor(w, monitor)
         GtkLayerShell.set_namespace(w, 'naga-pie')
-        GtkLayerShell.set_keyboard_interactivity(w, False)
+        GtkLayerShell.set_keyboard_mode(w, GtkLayerShell.KeyboardMode.NONE)
         GtkLayerShell.set_exclusive_zone(w, -1)
         for edge in (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.BOTTOM,
                      GtkLayerShell.Edge.LEFT, GtkLayerShell.Edge.RIGHT):
@@ -217,6 +217,7 @@ class Pie:
                 info = Gio.DesktopAppInfo.new(name + '.desktop')
             except TypeError:
                 info = None
+            info = info or app_by_name().get(normalize(name))
             if info and info.get_icon():
                 icon = info.get_icon()
                 candidates = (icon.get_names() if isinstance(icon, Gio.ThemedIcon) else [icon.to_string()]) + candidates
@@ -230,6 +231,26 @@ class Pie:
                 except GLib.Error:
                     continue
         return None
+
+
+def normalize(name):
+    return ''.join(ch for ch in name.lower() if ch.isalnum())
+
+
+_apps = None
+
+def app_by_name():
+    """Installed apps by normalized name and by the last part of their id, so 'Spotify' finds
+    the Flatpak 'com.spotify.Client'."""
+    global _apps
+    if _apps is None:
+        _apps = {}
+        for info in Gio.AppInfo.get_all():
+            app_id = (info.get_id() or '').removesuffix('.desktop')
+            for key in (info.get_name() or '', app_id, *app_id.split('.')):
+                if len(normalize(key)) >= 3:
+                    _apps.setdefault(normalize(key), info)
+    return _apps
 
 
 def read_stdin(pie):
