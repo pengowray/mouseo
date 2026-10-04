@@ -24,6 +24,11 @@ if [ ! -x "$HOME/.cargo/bin/cos-cli" ]; then
   log "Installing cos-cli"
   cargo install --locked --git https://github.com/estin/cos-cli
 fi
+# Reports the focused window's size to naga-daemon, for proportional resizing (thumb 7 + right drag)
+if [ ! -x "$HOME/.cargo/bin/cosmic-window-watch" ]; then
+  log "Installing cosmic-window-watch"
+  cargo install --locked --git https://github.com/pengowray/mouseo cosmic-window-watch
+fi
 # OpenRazer's udev rules only cover the USB receiver. This one lets the logged-in user read
 # the mouse over Bluetooth too (naga-daemon), and reach its control channel (mouseo).
 # It must sort before 73-seat-late.rules for uaccess to apply.
