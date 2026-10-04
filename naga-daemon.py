@@ -2,7 +2,7 @@
 """Linux replacement for the Windows AHK scripts used with the Razer Naga V2 HyperSpeed.
 
 Grabs the mouse's input devices, passes everything through unchanged, except while
-one of the carrier keys from layout.py (F13-F16, F21, F22) is held: then the wheel,
+one of the carrier keys from layout.py (F13-F16, F19, F24) is held: then the wheel,
 middle click and wheel tilts do the things described in config.toml.
 """
 import asyncio, json, os, shutil, subprocess, sys, threading, tomllib
@@ -15,8 +15,8 @@ DEVICE_NAME = 'Naga V2 HyperSpeed'
 OUR_PREFIX = 'naga-daemon'
 VERBOSE = '-v' in sys.argv
 
-F13, F14, F15, F16, F21, F22 = e.KEY_F13, e.KEY_F14, e.KEY_F15, e.KEY_F16, e.KEY_F21, e.KEY_F22
-CARRIERS = {F13, F14, F15, F16, F21, F22}
+F13, F14, F15, F16, F19, F24 = e.KEY_F13, e.KEY_F14, e.KEY_F15, e.KEY_F16, e.KEY_F19, e.KEY_F24
+CARRIERS = {F13, F14, F15, F16, F19, F24}
 TILT_LEFT, TILT_RIGHT = e.KEY_LEFTCTRL, e.KEY_F18   # what the onboard layout sends for wheel tilt
 ALIASES = {'shift': 'leftshift', 'ctrl': 'leftctrl', 'alt': 'leftalt', 'super': 'leftmeta'}
 
@@ -136,6 +136,11 @@ class Actions:
             keys.update(c for combo in combos.values() for c in combo)
             self.profiles.append((name, [a.lower() for a in p.get('apps', [])], combos))
         self.kbd = evdev.UInput({e.EV_KEY: sorted(keys)}, name=f'{OUR_PREFIX} keys')
+        self.ptt_button = getattr(e, config['push_to_talk'].upper(), None)
+        buttons = [e.BTN_LEFT, e.BTN_RIGHT, e.BTN_MIDDLE, e.BTN_SIDE, e.BTN_EXTRA,
+                   e.BTN_FORWARD, e.BTN_BACK, e.BTN_TASK]
+        self.pointer = evdev.UInput({e.EV_KEY: buttons, e.EV_REL: [e.REL_X, e.REL_Y]},
+                                    name=f'{OUR_PREFIX} buttons')
         self.notify_id = 0
         self.notifier = None
         self.dpi = DpiWorker()
@@ -176,9 +181,9 @@ class Actions:
                 self.media_action('faster' if up else 'slower')
             elif carrier == F16:
                 self.media_action('faster_fine' if up else 'slower_fine')
-            elif carrier == F22:
+            elif carrier == F24:
                 self.tap([e.KEY_LEFTMETA, e.KEY_EQUAL if up else e.KEY_MINUS])  # COSMIC screen zoom
-        if carrier == F21:
+        if carrier == F19:
             self.step_dpi(1 if up else -1)
 
     # Hold + middle click or wheel tilt. Returns False if nothing is assigned, so the key passes through.
@@ -199,12 +204,23 @@ class Actions:
         return True
 
     def press(self, carrier):
-        if carrier == F21:
+        if carrier == F19:
             self.dpi_shown = None
             self.dpi.request(refresh=True)
 
+    def push_to_talk(self, value):
+        """Returns False when push to talk is configured to pass F18 through unchanged."""
+        if self.ptt_button is None:
+            return False
+        if value in (0, 1):
+            self.pointer.write(e.EV_KEY, self.ptt_button, value)
+            self.pointer.syn()
+            if VERBOSE:
+                log('push to talk', 'down' if value else 'up')
+        return True
+
     def tap_alone(self, carrier):
-        if carrier == F21:
+        if carrier == F19:
             self.tap([e.KEY_LEFTCTRL, e.KEY_HOME])
 
     def release(self, carrier):
@@ -339,6 +355,8 @@ class Mouse:
                 if key in cls.swallowed:
                     if ev.value == 0:
                         cls.swallowed.discard(key)
+                    continue
+                if ev.code == TILT_RIGHT and self.actions.push_to_talk(ev.value):
                     continue
 
             self.out.write_event(ev)

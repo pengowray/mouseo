@@ -1,8 +1,8 @@
 # Settings for naga-daemon.py.
 #
 # The mouse sends these keys (set in layout.py), and the daemon gives them their behaviour:
-#   Thumb 1  (F22)  hold + wheel: screen zoom (Super+= / Super+-).
-#   Thumb 3  (F21)  tap: Ctrl+Home.   Hold + wheel: change DPI.
+#   Thumb 1  (F24)  hold + wheel: screen zoom (Super+= / Super+-).
+#   Thumb 3  (F19)  tap: Ctrl+Home.   Hold + wheel: change DPI.
 #   Thumb 8  (F13)  hold + wheel: volume of the focused app.
 #   Thumb 9  (F14)  hold + wheel: Spotify volume.
 #   Thumb 12 (F15)  hold + wheel: playback speed.
@@ -18,6 +18,12 @@ dpi_step = 50                # DPI change per wheel step (thumb 3)
 dpi_min = 200                # the notification bar is empty at dpi_min and full at dpi_max
 dpi_max = 2400
 volume_step = 2              # percent per wheel step (thumbs 8 and 9)
+
+# Tilt right and top button 2 send F18, which Discord can't bind. The daemon sends this mouse
+# button instead. Browsers ignore it. Use "key_f18" to pass F18 through unchanged.
+# For push to talk while Discord is in the background, turn on COSMIC Settings > Applications >
+# X11 applications compatibility > "Mouse button events in X11 applications".
+push_to_talk = "btn_task"    # mouse button 12; "btn_forward" and "btn_back" are 10 and 11
 
 # Which keys to send while holding thumb 11 or 12, by focused app.
 # "apps" matches part of the window's app_id, ignoring case.

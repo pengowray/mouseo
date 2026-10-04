@@ -1,13 +1,14 @@
 """Onboard layout for the Naga V2 HyperSpeed, based on Synapse profile "General v5".
 
-Keys F13-F16, F21 and F22 are carriers for naga-daemon.py, which gives them the
+Keys F13-F16, F19 and F24 are carriers for naga-daemon.py, which gives them the
 behaviour the Windows AHK scripts used to provide. Everything else works with
 no software running.
 """
 from qdrazer.protocol import ButtonFunction, FnDpiSwitch, FnKeyboardModifier as Mod, FnMouse
 
 # HID keyboard usages
-F13, F14, F15, F16, F18, F21, F22 = 0x68, 0x69, 0x6a, 0x6b, 0x6d, 0x70, 0x71
+# F19 and F24 have no meaning in the standard keymap; F21/F22 would toggle the touchpad without the daemon.
+F13, F14, F15, F16, F18, F19, F24 = 0x68, 0x69, 0x6a, 0x6b, 0x6d, 0x6e, 0x73
 ESC, HOME, END, PGUP, PGDN = 0x29, 0x4a, 0x4d, 0x4b, 0x4e
 COMMA, PERIOD, KP_ENTER = 0x36, 0x37, 0x58
 LCTRL, LALT = 0xe0, 0xe2
@@ -42,12 +43,12 @@ LAYOUT = {
     0x09: ('Wheel up',          mouse(FnMouse.WHEEL_UP),   media(VOL_UP)),
     0x0a: ('Wheel down',        mouse(FnMouse.WHEEL_DOWN), media(VOL_DOWN)),
     0x0b: ('Top button 1',      hyper(),                   hyper()),
-    0x0c: ('Top button 2',      key(F18),                  key(F18)),       # push to talk
+    0x0c: ('Top button 2',      key(F18),                  key(F18)),       # push to talk (daemon turns it into mouse button 12)
     0x34: ('Tilt left',         key(LCTRL),                media(PREV)),
     0x35: ('Tilt right',        key(F18),                  media(NEXT)),    # push to talk
-    0x40: ('Thumb 1',           key(F22),                  key(KP_ENTER)),  # daemon: hold + wheel screen zoom
+    0x40: ('Thumb 1',           key(F24),                  key(KP_ENTER)),  # daemon: hold + wheel screen zoom
     0x41: ('Thumb 2',           mouse(FnMouse.MIDDLE),     media(PLAY)),
-    0x42: ('Thumb 3',           key(F21),                  dpi(FnDpiSwitch.NEXT)),  # daemon: tap Ctrl+Home, hold + wheel DPI
+    0x42: ('Thumb 3',           key(F19),                  dpi(FnDpiSwitch.NEXT)),  # daemon: tap Ctrl+Home, hold + wheel DPI
     0x43: ('Thumb 4',           key(LALT, Mod.LEFT_SHIFT), media(PREV)),
     0x44: ('Thumb 5',           hyper(),                   hyper()),
     0x45: ('Thumb 6',           key(END, Mod.LEFT_CONTROL), media(NEXT)),
