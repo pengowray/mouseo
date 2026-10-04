@@ -2,7 +2,7 @@ import argparse, asyncio, logging, os, sys, tomllib
 from types import SimpleNamespace
 import evdev
 from evdev import ecodes as e
-from . import audio, players, keys
+from . import keys
 from .controls import AppControl, SpeedControl, ZoomControl, DpiControl, MonitorControl, WindowControl, MEDIA_KEYS
 from .dpi import DpiWorker
 from .focus import Focus
@@ -19,8 +19,7 @@ CONFIG = os.environ.get('NAGA_CONFIG') or os.path.expanduser('~/.config/naga/con
 
 def build(config, focus):
     profiles = Profiles(config['profiles'])
-    output = Output(profiles.keys() | set(MEDIA_KEYS.values()) | set(ZoomControl.KEYS)
-                    | set(VOLUME_KEYS) | set(WindowControl.TAP))
+    output = Output(profiles.keys() | set(MEDIA_KEYS.values()) | set(ZoomControl.KEYS) | set(VOLUME_KEYS))
     ctx = SimpleNamespace(focus=focus, profiles=profiles, output=output, notifier=Notifier())
     step = config['volume_step']
     pie_ui = PieUI()
@@ -30,9 +29,6 @@ def build(config, focus):
         keys.WINDOW: WindowControl(ctx),
         keys.FOCUSED_APP: AppControl(ctx, lambda: focus.app_id, step, ('App volume', 'No window is focused')),
         keys.SPOTIFY: AppControl(ctx, lambda: 'spotify', step),
-        keys.BACKGROUND_APP: AppControl(
-            ctx, lambda: audio.background_app(focus.app_id, players.playing()), step,
-            ('Background app volume', 'No other app is playing sound')),
         keys.SPEED: SpeedControl(ctx, fine=False),
         keys.FINE_SPEED: SpeedControl(ctx, fine=True),
         keys.DPI: DpiControl(ctx, DpiWorker(), config['dpi_min'], config['dpi_max'], config['dpi_step'],

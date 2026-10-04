@@ -104,19 +104,14 @@ class ZoomControl(Control):
 
 
 class WindowControl(Control):
-    """Tap: Ctrl+End. Hold + tilt right / left: keep the focused window on top or stop.
+    """Hold + tilt right / left: keep the focused window on top or stop.
 
     COSMIC has no "always on top", so this uses sticky: the window floats above the others
     and shows on every workspace.
     """
 
-    TAP = [e.KEY_LEFTCTRL, e.KEY_END]
-
     def __init__(self, ctx):
         self.ctx = ctx
-
-    def tap(self):
-        self.ctx.output.tap(self.TAP)
 
     def button(self, code):
         if code not in (TILT_LEFT, TILT_RIGHT):

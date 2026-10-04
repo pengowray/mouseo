@@ -45,27 +45,6 @@ def streams_for(app):
     return [s for s in list_streams() if s.belongs_to(app)]
 
 
-def background_app(focused_app, playing_players, exclude=('spotify',)):
-    """An app with audio that is not focused and not excluded, or None.
-
-    Apps whose player says it is playing come first, then active streams, then paused ones.
-    """
-    skip = [normalize(a) for a in (focused_app, *exclude) if a]
-
-    def rank(stream):
-        if any(names_match(n, p) for n in stream.names for p in playing_players):
-            return 0
-        return 2 if stream.corked else 1
-
-    for stream in sorted(list_streams(), key=rank):
-        if not stream.names or any('speechdispatcher' in n for n in stream.names):
-            continue
-        if any(names_match(n, k) for n in stream.names for k in skip):
-            continue
-        return stream.app
-    return None
-
-
 def change_volume(indexes, percent):
     for index in indexes:
         subprocess.run(['pactl', 'set-sink-input-volume', index, f'{percent:+d}%'])

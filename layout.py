@@ -1,6 +1,6 @@
 """Onboard layout for the Naga V2 HyperSpeed, based on Synapse profile "General v5".
 
-Keys F13-F17, F19, F24, Ro, Henkan and Muhenkan are carriers for naga-daemon.py, which gives them the
+Keys F13-F17, F19, F24, Ro and Henkan are carriers for naga-daemon.py, which gives them the
 behaviour the Windows AHK scripts used to provide. Everything else works with
 no software running.
 """
@@ -11,7 +11,7 @@ from qdrazer.protocol import ButtonFunction, FnKeyboardModifier as Mod, FnMouse
 F13, F14, F15, F16, F17, F18, F19, F24 = 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x73
 ESC, HOME, END, KP_ENTER = 0x29, 0x4a, 0x4d, 0x58
 RO = 0x87  # Japanese Ro key: no meaning in a US layout, used as a carrier key for the daemon
-HENKAN, MUHENKAN = 0x8a, 0x8b  # Japanese keys, also carriers
+HENKAN = 0x8a  # Japanese key, also a carrier
 LCTRL, LALT = 0xe0, 0xe2
 # HID consumer usages
 PLAY, NEXT, PREV, VOL_UP, VOL_DOWN = 0xcd, 0xb5, 0xb6, 0xe9, 0xea
@@ -49,8 +49,8 @@ LAYOUT = {
     0x42: ('Thumb 3',           key(HOME, Mod.LEFT_CONTROL), off()),
     0x43: ('Thumb 4',           key(RO),                   media(PREV)),    # daemon: monitor brightness and colour
     0x44: ('Thumb 5',           key(HENKAN),               off()),          # daemon: volume pie
-    0x45: ('Thumb 6',           key(MUHENKAN),             media(NEXT)),    # daemon: tap Ctrl+End, hold + tilt always on top
-    0x46: ('Thumb 7',           key(F17),                  off()),  # daemon: background app volume
+    0x45: ('Thumb 6',           key(END, Mod.LEFT_CONTROL), media(NEXT)),
+    0x46: ('Thumb 7',           key(F17),                  off()),  # daemon: hold + tilt always on top
     0x47: ('Thumb 8',           key(F13),                  off()),    # daemon: focused app volume
     0x48: ('Thumb 9',           key(F14),                  off()),  # daemon: Spotify volume
     0x49: ('Thumb 10',          key(ESC),                  off()),

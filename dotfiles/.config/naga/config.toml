@@ -12,14 +12,12 @@
 #                   playing sound appears around the pointer (up: focused app, down: the
 #                   background app you're most likely hearing). The wheel, middle click and
 #                   tilts go to the app under the pointer.
-#   Thumb 6  (Muhenkan) tap: Ctrl+End. Hold + tilt right / left: keep the focused window on top
-#                   (COSMIC "sticky") / stop.
 #   Thumb 8  (F13)  hold + wheel: volume of the focused app.
 #   Thumb 9  (F14)  hold + wheel: Spotify volume.
-#   Thumb 7  (F17)  hold + wheel: volume of another app playing sound (not focused, not Spotify).
+#   Thumb 7  (F17)  hold + tilt right / left: keep the focused window on top (COSMIC "sticky") / stop.
 #   Thumb 12 (F15)  hold + wheel: playback speed.
 #   Thumb 11 (F16)  hold + wheel: fine playback speed.
-# While holding thumb 5, 7, 8 or 9: middle click = play/pause, tilt left/right = previous/next track,
+# While holding thumb 5, 8 or 9:   middle click = play/pause, tilt left/right = previous/next track,
 #                                  sent to the app that button controls.
 # While holding thumb 11 or 12:    middle click = play/pause, tilt left/right = seek back/forward.
 #
@@ -29,7 +27,7 @@
 dpi_step = 50                # DPI change per wheel step (thumb 2)
 dpi_min = 200                # the notification bar is empty at dpi_min and full at dpi_max
 dpi_max = 2400
-volume_step = 2              # percent per wheel step (thumbs 5, 7, 8 and 9; thumb 5's system volume uses the desktop's step)
+volume_step = 2              # percent per wheel step (thumbs 5, 8 and 9; thumb 5's system volume uses the desktop's step)
 brightness_step = 5          # percent per wheel step (thumb 4)
 
 # Tilt right and top button 2 send F18, which Discord can't bind. The daemon sends this mouse

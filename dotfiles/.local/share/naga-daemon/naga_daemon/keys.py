@@ -7,14 +7,13 @@ OUR_PREFIX = 'naga-daemon'   # name prefix of our own virtual devices, so we nev
 # Carrier keys sent by held thumb buttons
 FOCUSED_APP = e.KEY_F13      # thumb 8
 SPOTIFY = e.KEY_F14          # thumb 9
-BACKGROUND_APP = e.KEY_F17   # thumb 7
+WINDOW = e.KEY_F17           # thumb 7
 SPEED = e.KEY_F15            # thumb 12
 FINE_SPEED = e.KEY_F16       # thumb 11
 DPI = e.KEY_F19              # thumb 2
 ZOOM = e.KEY_F24             # thumb 1
 MONITOR = e.KEY_RO           # thumb 4. Japanese Ro key: no meaning in a US layout, and F20-F23 mute the mic or toggle the touchpad
 PIE = e.KEY_HENKAN           # thumb 5. Japanese Henkan key, also meaningless in a US layout
-WINDOW = e.KEY_MUHENKAN      # thumb 6. Japanese Muhenkan key
 
 # Buttons that a held carrier can redirect
 MIDDLE = e.BTN_MIDDLE
