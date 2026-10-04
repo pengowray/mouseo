@@ -5,7 +5,8 @@ Grabs the mouse's input devices, passes everything through unchanged, except whi
 one of the carrier keys from layout.py (F13-F16, F21, F22) is held: then the wheel,
 middle click and wheel tilts do the things described in config.toml.
 """
-import asyncio, json, os, shutil, subprocess, sys, tomllib
+import asyncio, json, os, shutil, subprocess, sys, threading, tomllib
+import dbus
 import evdev
 from evdev import ecodes as e
 
@@ -75,6 +76,53 @@ class Focus:
                 return
 
 
+class DpiWorker(threading.Thread):
+    """Talks to OpenRazer off the input thread, so DPI notifications show without waiting.
+
+    Only the latest requested DPI is sent; steps that pile up while a write is in progress are skipped.
+    """
+
+    def __init__(self):
+        super().__init__(daemon=True)
+        self.lock = threading.Lock()
+        self.wake = threading.Event()
+        self.wanted = None        # DPI to send to the mouse
+        self.refresh = False      # re-read the DPI from the mouse
+        self.current = None       # last DPI known to be on the mouse
+        self.error = None
+        self.start()
+
+    def request(self, dpi=None, refresh=False):
+        with self.lock:
+            if dpi is not None:
+                self.wanted = dpi
+            self.refresh |= refresh
+        self.wake.set()
+
+    def run(self):
+        mouse = None
+        while True:
+            self.wake.wait()
+            self.wake.clear()
+            with self.lock:
+                wanted, refresh = self.wanted, self.refresh
+                self.wanted, self.refresh = None, False
+            try:
+                if mouse is None:
+                    from openrazer.client import DeviceManager
+                    mouse = next((d for d in DeviceManager().devices if DEVICE_NAME in d.name), None)
+                    if mouse is None:
+                        raise LookupError('mouse not found in OpenRazer')
+                if wanted is not None:
+                    mouse.dpi = (wanted, wanted)
+                    self.current = wanted
+                elif refresh or self.current is None:
+                    self.current = mouse.dpi[0]
+                self.error = None
+            except Exception as err:  # OpenRazer not running, or the mouse is on Bluetooth
+                mouse, self.error = None, str(err) or type(err).__name__
+
+
 class Actions:
     def __init__(self, config, focus):
         self.config = config
@@ -88,7 +136,10 @@ class Actions:
             keys.update(c for combo in combos.values() for c in combo)
             self.profiles.append((name, [a.lower() for a in p.get('apps', [])], combos))
         self.kbd = evdev.UInput({e.EV_KEY: sorted(keys)}, name=f'{OUR_PREFIX} keys')
-        self.notify_id = None
+        self.notify_id = 0
+        self.notifier = None
+        self.dpi = DpiWorker()
+        self.dpi_shown = None
         self.volume_target = None
 
     def profile(self):
@@ -133,13 +184,24 @@ class Actions:
     # Hold + middle click or wheel tilt. Returns False if nothing is assigned, so the key passes through.
     def button(self, carrier, code):
         if carrier in (F13, F14):
-            self.tap([{e.BTN_MIDDLE: e.KEY_PLAYPAUSE, TILT_LEFT: e.KEY_PREVIOUSSONG,
-                       TILT_RIGHT: e.KEY_NEXTSONG}[code]])
+            app = self.focus.app_id if carrier == F13 else 'spotify'
+            command = {e.BTN_MIDDLE: 'play-pause', TILT_LEFT: 'previous', TILT_RIGHT: 'next'}[code]
+            player = self.find_player(app)
+            if player:
+                subprocess.run(['playerctl', '-p', player, command])
+            else:  # app has no media controls; let the desktop pick a player
+                self.tap([{e.BTN_MIDDLE: e.KEY_PLAYPAUSE, TILT_LEFT: e.KEY_PREVIOUSSONG,
+                           TILT_RIGHT: e.KEY_NEXTSONG}[code]])
         elif carrier in (F15, F16):
             self.media_action({e.BTN_MIDDLE: 'play_pause', TILT_LEFT: 'back', TILT_RIGHT: 'forward'}[code])
         else:
             return False
         return True
+
+    def press(self, carrier):
+        if carrier == F21:
+            self.dpi_shown = None
+            self.dpi.request(refresh=True)
 
     def tap_alone(self, carrier):
         if carrier == F21:
@@ -166,6 +228,17 @@ class Actions:
             self.notify(f'{label} volume', f'{bar(level, 0, 100)}  {level}%')
 
     @staticmethod
+    def find_player(app_id):
+        """The MPRIS player name (as playerctl knows it) belonging to the app, if any."""
+        want = normalize(app_id)
+        out = subprocess.run(['playerctl', '-l'], capture_output=True, text=True).stdout
+        for player in out.split():
+            name = normalize(player.split('.')[0])
+            if len(name) >= 3 and (name in want or want in name):
+                return player
+        return None
+
+    @staticmethod
     def list_streams():
         out = subprocess.run(['pactl', '-f', 'json', 'list', 'sink-inputs'],
                              capture_output=True, text=True).stdout
@@ -190,27 +263,33 @@ class Actions:
         return found
 
     def step_dpi(self, direction):
-        try:
-            from openrazer.client import DeviceManager
-            mouse = next(d for d in DeviceManager().devices if DEVICE_NAME in d.name)
-        except Exception as err:  # OpenRazer not running, or the mouse is on Bluetooth
-            self.notify('DPI', f'Cannot change DPI: {err or "mouse not found in OpenRazer"}')
+        current = self.dpi_shown or self.dpi.current
+        if current is None:
+            self.notify('DPI', f'Cannot change DPI: {self.dpi.error or "still connecting to OpenRazer"}')
+            self.dpi.request(refresh=True)
             return
         lo, hi, step = self.config['dpi_min'], self.config['dpi_max'], self.config['dpi_step']
-        current = mouse.dpi[0]
         new = min(hi, max(lo, (current // step + direction) * step))
-        if new != current:
-            mouse.dpi = (new, new)
+        self.dpi_shown = new
         self.notify('DPI', f'{bar(new, lo, hi)}  {new}')
+        if new != current:
+            self.dpi.request(new)
         if VERBOSE:
             log('dpi', current, '->', new)
 
     def notify(self, title, body):
-        cmd = ['notify-send', '--print-id', '-t', '1500', '-a', 'Naga', '-h', 'boolean:transient:true', title, body]
-        if self.notify_id:
-            cmd[2:2] = ['-r', self.notify_id]
-        out = subprocess.run(cmd, capture_output=True, text=True).stdout.strip()
-        self.notify_id = out or self.notify_id
+        try:
+            if self.notifier is None:
+                bus = dbus.SessionBus(private=True)
+                self.notifier = dbus.Interface(
+                    bus.get_object('org.freedesktop.Notifications', '/org/freedesktop/Notifications'),
+                    'org.freedesktop.Notifications')
+            self.notify_id = int(self.notifier.Notify(
+                'Naga', dbus.UInt32(self.notify_id), '', title, body, [],
+                {'transient': dbus.Boolean(True)}, 1500))
+        except dbus.DBusException as err:
+            self.notifier = None
+            log('notification failed:', err)
 
 
 class Mouse:
@@ -232,6 +311,7 @@ class Mouse:
             if ev.type == e.EV_KEY and ev.code in CARRIERS:
                 if ev.value == 1 and cls.held is None:
                     cls.held, cls.used = ev.code, False
+                    self.actions.press(ev.code)
                 elif ev.value == 0 and cls.held == ev.code:
                     if not cls.used:
                         self.actions.tap_alone(ev.code)
