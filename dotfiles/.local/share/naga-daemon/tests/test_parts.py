@@ -36,3 +36,10 @@ class PartsTest(unittest.TestCase):
         f.update({'params': {'state': {'apps': [{'app_id': 'kitty', 'state': []},
                                                 {'app_id': 'firefox', 'state': ['maximized', 'activated']}]}}})
         self.assertEqual(f.app_id, 'firefox')
+
+
+class MonitorParsingTest(unittest.TestCase):
+    def test_parse_getvcp(self):
+        from naga_daemon.monitors import parse_getvcp
+        self.assertEqual(parse_getvcp('VCP 10 C 70 100\nVCP 14 CNC x00 x0b x00 x06\n'), {0x10: 70, 0x14: 6})
+        self.assertEqual(parse_getvcp('VCP 14 SNC x05'), {0x14: 5})

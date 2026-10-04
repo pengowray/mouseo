@@ -7,6 +7,7 @@ and release() when the button comes up.
 import logging
 from evdev import ecodes as e
 from . import audio, players
+from .monitors import BRIGHTNESS, COLOUR_PRESET
 from .keys import MIDDLE, TILT_LEFT, TILT_RIGHT
 from .util import bar, app_label
 
@@ -131,3 +132,57 @@ class DpiControl(Control):
 
     def tap(self):
         self.on_tap()
+
+
+class MonitorControl(Control):
+    """Hold + wheel: brightness of the focused window's monitor. Hold + tilt left / right: warmer / cooler preset.
+
+    `presets` maps a monitor serial to its colour presets, warmest first: [(value, name), ...].
+    """
+
+    def __init__(self, ctx, worker, step, presets):
+        self.ctx, self.worker, self.step, self.presets = ctx, worker, step, presets
+        self.monitor = None
+
+    def press(self):
+        self.monitor = self.worker.find(self.ctx.focus.output)
+        if self.monitor:
+            self.worker.refresh(self.monitor)
+
+    def ready(self):
+        if self.monitor is None:
+            self.monitor = self.worker.find(self.ctx.focus.output)
+        if self.monitor is None:
+            self.ctx.notifier.show('Monitor', 'Still looking for monitors')
+        return self.monitor
+
+    def wheel(self, up):
+        if not (m := self.ready()):
+            return
+        current = m.values.get(BRIGHTNESS)
+        if current is None:
+            self.ctx.notifier.show(f'{m.model} brightness', 'Reading the monitor, try again')
+            return
+        new = min(100, max(0, current + (self.step if up else -self.step)))
+        self.ctx.notifier.show(f'{m.model} brightness', f'{bar(new, 0, 100)}  {new}%')
+        if new != current:
+            self.worker.set(m, BRIGHTNESS, new)
+
+    def button(self, code):
+        if code not in (TILT_LEFT, TILT_RIGHT):
+            return False
+        if not (m := self.ready()):
+            return True
+        presets = self.presets.get(m.serial)
+        title = f'{m.model} colour'
+        if not presets:
+            self.ctx.notifier.show(title, 'No colour presets for this monitor in config.toml')
+            return True
+        values = [v for v, _ in presets]
+        current = m.values.get(COLOUR_PRESET)
+        i = values.index(current) if current in values else len(values) // 2
+        i = max(0, i - 1) if code == TILT_LEFT else min(len(values) - 1, i + 1)
+        self.ctx.notifier.show(title, f'{bar(i, 0, len(values) - 1)}  {presets[i][1]}')
+        if values[i] != current:
+            self.worker.set(m, COLOUR_PRESET, values[i])
+        return True

@@ -8,6 +8,7 @@ class Focus:
 
     def __init__(self):
         self.app_id = ''
+        self.output = ''   # COSMIC output name of the focused window, e.g. 'DP-1'
 
     async def run(self):
         exe = shutil.which('cos-cli') or os.path.expanduser('~/.cargo/bin/cos-cli')
@@ -33,4 +34,6 @@ class Focus:
         for app in state.get('apps', []):
             if 'activated' in app.get('state', []):
                 self.app_id = app.get('app_id', '')
+                outputs = app.get('outputs') or [{}]
+                self.output = outputs[0].get('name', '')
                 return

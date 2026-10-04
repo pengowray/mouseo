@@ -3,9 +3,10 @@ from types import SimpleNamespace
 import evdev
 from evdev import ecodes as e
 from . import audio, players, keys
-from .controls import AppControl, SpeedControl, ZoomControl, DpiControl, MEDIA_KEYS
+from .controls import AppControl, SpeedControl, ZoomControl, DpiControl, MonitorControl, MEDIA_KEYS
 from .dpi import DpiWorker
 from .focus import Focus
+from .monitors import MonitorWorker
 from .notify import Notifier
 from .output import Output
 from .profiles import Profiles
@@ -31,6 +32,9 @@ def build(config, focus):
         keys.DPI: DpiControl(ctx, DpiWorker(), config['dpi_min'], config['dpi_max'], config['dpi_step'],
                              on_tap=lambda: output.click(e.BTN_MIDDLE)),
         keys.ZOOM: ZoomControl(ctx),
+        keys.MONITOR: MonitorControl(ctx, MonitorWorker(), config['brightness_step'], {
+            serial: [(p['value'], p['name']) for p in m['colour_presets']]
+            for serial, m in config.get('monitors', {}).items()}),
     }
     ptt = getattr(e, config['push_to_talk'].upper(), None)
     if ptt is not None and ptt not in e.BTN.keys():

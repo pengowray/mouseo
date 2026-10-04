@@ -4,6 +4,8 @@
 # The mouse sends these keys (set in ~/projects/mouseo/layout.py), and the daemon gives them their behaviour:
 #   Thumb 1  (F24)  hold + wheel: screen zoom (Super+= / Super+-).
 #   Thumb 2  (F19)  tap: middle click.   Hold + wheel: change DPI.
+#   Thumb 4  (Ro)   hold + wheel: brightness of the monitor with the focused window.
+#                   Hold + tilt left / right: warmer / cooler colour preset.
 #   Thumb 8  (F13)  hold + wheel: volume of the focused app.
 #   Thumb 9  (F14)  hold + wheel: Spotify volume.
 #   Thumb 7  (F17)  hold + wheel: volume of another app playing sound (not focused, not Spotify).
@@ -19,7 +21,8 @@
 dpi_step = 50                # DPI change per wheel step (thumb 2)
 dpi_min = 200                # the notification bar is empty at dpi_min and full at dpi_max
 dpi_max = 2400
-volume_step = 2              # percent per wheel step (thumbs 8 and 9)
+volume_step = 2              # percent per wheel step (thumbs 7, 8 and 9)
+brightness_step = 5          # percent per wheel step (thumb 4)
 
 # Tilt right and top button 2 send F18, which Discord can't bind. The daemon sends this mouse
 # button instead. Browsers ignore it. Use "key_f18" to pass F18 through unchanged.
@@ -63,3 +66,24 @@ play_pause = "space"
 back = "left"
 forward = "right"
 play_pause = "playpause"
+
+# Colour presets for thumb 4 + tilt, warmest first, by monitor serial number.
+# List a monitor's presets with: ddcutil --sn SERIAL capabilities  (feature 14)
+# monitor-night-light also sets these presets at 22:30 and 06:00.
+
+[monitors.304NTJJ4A468]      # LG ULTRAGEAR, DP-1
+colour_presets = [
+    { value = 0x0b, name = "User 1 (night)" },
+    { value = 0x05, name = "6500 K" },
+    { value = 0x08, name = "9300 K" },
+]
+
+[monitors.UHB1733028185]     # Philips 271S7Q, DP-2
+colour_presets = [
+    { value = 0x04, name = "5000 K" },
+    { value = 0x05, name = "6500 K" },
+    { value = 0x06, name = "7500 K" },
+    { value = 0x07, name = "8200 K" },
+    { value = 0x08, name = "9300 K" },
+    { value = 0x0a, name = "11500 K" },
+]

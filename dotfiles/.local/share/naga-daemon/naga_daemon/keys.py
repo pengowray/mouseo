@@ -12,6 +12,7 @@ SPEED = e.KEY_F15            # thumb 12
 FINE_SPEED = e.KEY_F16       # thumb 11
 DPI = e.KEY_F19              # thumb 2
 ZOOM = e.KEY_F24             # thumb 1
+MONITOR = e.KEY_RO           # thumb 4. Japanese Ro key: no meaning in a US layout, and F20-F23 mute the mic or toggle the touchpad
 
 # Buttons that a held carrier can redirect
 MIDDLE = e.BTN_MIDDLE

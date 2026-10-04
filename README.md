@@ -8,8 +8,8 @@ Onboard button layout for a Razer Naga V2 HyperSpeed, written from Linux without
 # about
 
 The layout is stored in the mouse, so it works on any computer. A few buttons send spare
-F-keys (F13-F17, F19, F24) that the `naga-daemon` user service turns into app volume,
-playback speed, DPI, screen zoom and push to talk. The daemon and its settings are in the
+keys (F13-F17, F19, F24, and the Japanese Ro key) that the `naga-daemon` user service turns into app volume,
+playback speed, DPI, screen zoom, monitor brightness and push to talk. The daemon and its settings are in the
 chezmoi dotfiles, not here:
 
 - `~/.local/share/naga-daemon/naga_daemon/` (the code; `~/.local/bin/naga-daemon` starts it)
@@ -60,7 +60,7 @@ Only works through the USB receiver (product id `00b4`), not Bluetooth.
 | Thumb 1 | hold + wheel: screen zoom | Keypad Enter |
 | Thumb 2 | tap: middle click, hold + wheel: DPI | play/pause |
 | Thumb 3 | Ctrl+Home | nothing |
-| Thumb 4 | Shift+Alt | previous track |
+| Thumb 4 | hold + wheel: monitor brightness, + tilt: colour preset | previous track |
 | Thumb 5 | Hyper | Hyper |
 | Thumb 6 | Ctrl+End | next track |
 | Thumb 7 | hold: background app's volume and media | nothing |
