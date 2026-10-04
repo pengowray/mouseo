@@ -54,16 +54,16 @@ Only works through the USB receiver (product id `00b4`), not Bluetooth.
 | Tilt left / right | Ctrl / push to talk | previous / next track |
 | Thumb 1 | hold + wheel: screen zoom | Keypad Enter |
 | Thumb 2 | middle click | play/pause |
-| Thumb 3 | tap: Ctrl+Home, hold + wheel: DPI | DPI stage up |
+| Thumb 3 | tap: Ctrl+Home, hold + wheel: DPI | nothing |
 | Thumb 4 | Shift+Alt | previous track |
 | Thumb 5 | Hyper | Hyper |
 | Thumb 6 | Ctrl+End | next track |
-| Thumb 7 | hold: background app's volume and media | Right Alt+Page Up |
-| Thumb 8 | hold: focused app's volume and media | play/pause |
-| Thumb 9 | hold: Spotify's volume and media | DPI stage down |
-| Thumb 10 | Esc | Right Alt+Page Down |
-| Thumb 11 | hold: fine playback speed, seek | `<` |
-| Thumb 12 | hold: playback speed, seek | `>` |
+| Thumb 7 | hold: background app's volume and media | nothing |
+| Thumb 8 | hold: focused app's volume and media | nothing |
+| Thumb 9 | hold: Spotify's volume and media | nothing |
+| Thumb 10 | Esc | nothing |
+| Thumb 11 | hold: fine playback speed, seek | nothing |
+| Thumb 12 | hold: playback speed, seek | nothing |
 
 Push to talk reaches apps as mouse button 12 (Discord shows it as MOUSE12).
 
