@@ -1,6 +1,6 @@
-//! Prints one JSON line each time the focused COSMIC window changes, moves or resizes:
-//! {"app_id": "firefox", "x": 10, "y": 20, "width": 800, "height": 450}
-//! x and y are relative to the window's output. Prints {} when no window is focused.
+//! Prints one JSON line for each COSMIC window that appears, changes, moves or resizes:
+//! {"id": "...", "app_id": "firefox", "focused": true, "x": 10, "y": 20, "width": 800, "height": 450}
+//! x and y are relative to the window's output. A closed window prints {"id": "...", "closed": true}.
 //! naga-daemon reads this to resize windows proportionally.
 
 use cosmic_client_toolkit::cosmic_protocols::toplevel_info::v1::client::zcosmic_toplevel_handle_v1::State;
@@ -17,25 +17,23 @@ struct AppData {
     output_state: OutputState,
     registry_state: RegistryState,
     toplevel_info_state: ToplevelInfoState,
-    last: String,
+    last: std::collections::HashMap<String, String>,
+}
+
+fn json_str(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 impl AppData {
-    fn focused_json(&self) -> String {
-        for info in self.toplevel_info_state.toplevels() {
-            if !info.state.contains(&State::Activated) {
-                continue;
-            }
-            let app_id = info.app_id.replace('\\', "\\\\").replace('"', "\\\"");
-            return match info.geometry.values().next() {
-                Some(g) => format!(
-                    r#"{{"app_id": "{app_id}", "x": {}, "y": {}, "width": {}, "height": {}}}"#,
-                    g.x, g.y, g.width, g.height
-                ),
-                None => format!(r#"{{"app_id": "{app_id}"}}"#),
-            };
-        }
-        "{}".to_string()
+    fn window_json(info: &cosmic_client_toolkit::toplevel_info::ToplevelInfo) -> String {
+        let id = json_str(&info.identifier);
+        let app_id = json_str(&info.app_id);
+        let focused = info.state.contains(&State::Activated);
+        let geometry = match info.geometry.values().next() {
+            Some(g) => format!(r#", "x": {}, "y": {}, "width": {}, "height": {}"#, g.x, g.y, g.width, g.height),
+            None => String::new(),
+        };
+        format!(r#"{{"id": "{id}", "app_id": "{app_id}", "focused": {focused}{geometry}}}"#)
     }
 }
 
@@ -65,13 +63,30 @@ impl ToplevelInfoHandler for AppData {
     fn toplevel_closed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &ExtForeignToplevelHandleV1) {}
 
     fn info_done(&mut self, _: &Connection, _: &QueueHandle<Self>) {
-        let json = self.focused_json();
-        if json != self.last {
-            let mut out = std::io::stdout().lock();
-            if writeln!(out, "{json}").and_then(|_| out.flush()).is_err() {
-                std::process::exit(0); // reader went away
+        let mut lines = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for info in self.toplevel_info_state.toplevels() {
+            seen.insert(info.identifier.clone());
+            let json = Self::window_json(info);
+            if self.last.get(&info.identifier) != Some(&json) {
+                self.last.insert(info.identifier.clone(), json.clone());
+                lines.push(json);
             }
-            self.last = json;
+        }
+        self.last.retain(|id, _| {
+            let open = seen.contains(id);
+            if !open {
+                lines.push(format!(r#"{{"id": "{}", "closed": true}}"#, json_str(id)));
+            }
+            open
+        });
+        if lines.is_empty() {
+            return;
+        }
+        let mut out = std::io::stdout().lock();
+        let text = lines.join("\n") + "\n";
+        if out.write_all(text.as_bytes()).and_then(|_| out.flush()).is_err() {
+            std::process::exit(0); // reader went away
         }
     }
 }
@@ -85,7 +100,7 @@ fn main() {
         output_state: OutputState::new(&globals, &qh),
         toplevel_info_state: ToplevelInfoState::new(&registry_state, &qh),
         registry_state,
-        last: String::new(),
+        last: std::collections::HashMap::new(),
     };
     loop {
         event_queue.blocking_dispatch(&mut app_data).expect("Wayland connection lost");

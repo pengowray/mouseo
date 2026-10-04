@@ -3,9 +3,10 @@
 The daemon holds Super and the right button down for COSMIC, which starts its own resize, and
 bends the pointer movement onto the window's diagonal so the width and height keep their ratio.
 
-Which corner COSMIC is resizing from depends on where the window was grabbed, so a resize
-starts with a small probe: move the pointer a few counts right and down, see which edges of
-the focused window moved (from cosmic-window-watch), and move back.
+Which corner COSMIC resizes from depends on where the window was grabbed. The drag starts
+unconstrained; the first window whose edges move (reported by cosmic-window-watch) is the one
+being resized, and which edges moved gives the corner. From then on the movement follows the
+diagonal, nudged back whenever the live size drifts off the original ratio.
 """
 import json, logging, os, shutil, subprocess, threading, time
 from evdev import ecodes as e
@@ -13,16 +14,15 @@ from evdev import ecodes as e
 log = logging.getLogger(__name__)
 
 WATCHER = shutil.which('cosmic-window-watch') or os.path.expanduser('~/.cargo/bin/cosmic-window-watch')
-PROBE = 3            # pointer counts moved for the probe
-PROBE_WAIT = 0.25    # seconds to wait for the window to answer the probe
+CORRECTION = 0.3     # fraction of the ratio error corrected per movement event
+MAX_CORRECTION = 6   # pointer counts
 
 
 class WindowWatch:
-    """The focused window's geometry, kept current by a long-running cosmic-window-watch."""
+    """Every window's geometry by id, kept current by a long-running cosmic-window-watch."""
 
     def __init__(self):
-        self.window = {}          # {"app_id", "x", "y", "width", "height"}, or {} when unknown
-        self.changed = threading.Condition()
+        self.windows = {}         # id -> {"app_id", "focused", "x", "y", "width", "height"}
 
     def start(self):
         threading.Thread(target=self._run, daemon=True).start()
@@ -36,32 +36,32 @@ class WindowWatch:
                         window = json.loads(line)
                     except ValueError:
                         continue
-                    with self.changed:
-                        self.window = window
-                        self.changed.notify_all()
+                    if window.get('closed'):
+                        self.windows.pop(window['id'], None)
+                    elif 'width' in window:
+                        self.windows[window['id']] = window
                 log.warning('cosmic-window-watch exited with code %s', proc.wait())
             except OSError as err:
                 log.warning('cannot run cosmic-window-watch: %s', err)
-            self.window = {}
+            self.windows = {}
             time.sleep(5)
 
-    def wait_change(self, old, timeout):
-        """The window once it differs from `old`, or None after `timeout` seconds."""
-        deadline = time.monotonic() + timeout
-        with self.changed:
-            while self.window == old:
-                left = deadline - time.monotonic()
-                if left <= 0:
-                    return None
-                self.changed.wait(left)
-            return self.window
+
+def resized_window(before, now):
+    """The id of the first window whose size changed since `before`, or None."""
+    for wid, w in now.items():
+        old = before.get(wid)
+        if old and (w['width'], w['height']) != (old['width'], old['height']):
+            return wid
+    return None
 
 
 def corner(before, after):
-    """Which corner a probe moving right and down resized from, as (x sign, y sign).
+    """Which corner is being dragged, as (x sign, y sign), from a window before and during a resize.
 
-    Growing on the right means the right edge is held (+1); the left edge moving right means the
-    left edge is held (-1). The same goes for bottom (+1) and top (-1). None if nothing moved.
+    The right edge moving means the right side is held (+1); the left edge (x) moving means the
+    left side is held (-1). The same goes for bottom (+1) and top (-1). A sign is None until
+    that axis has moved.
     """
     def sign(pos, size):
         if after[pos] != before[pos]:
@@ -69,8 +69,7 @@ def corner(before, after):
         if after[size] != before[size]:
             return 1
         return None
-    sx, sy = sign('x', 'width'), sign('y', 'height')
-    return None if sx is None or sy is None else (sx, sy)
+    return sign('x', 'width'), sign('y', 'height')
 
 
 def project(dx, dy, direction):
@@ -84,58 +83,68 @@ class ProportionalResize:
     def __init__(self, output, watch):
         self.output, self.watch = output, watch
         self.active = False
-        self.direction = None     # the diagonal to move along; None while probing or if the probe failed
-        self.probing = False
-        self.buffered = [0, 0]
-        self.remainder = [0.0, 0.0]
         self.lock = threading.Lock()
 
     def start(self):
         with self.lock:
-            self.active, self.probing, self.direction = True, True, None
-            self.buffered, self.remainder = [0, 0], [0.0, 0.0]
+            self.active = True
+            self.before = {k: dict(v) for k, v in self.watch.windows.items()}
+            self.target = None        # id of the window being resized, once known
+            self.signs = (None, None)
+            self.direction = None
+            self.remainder = [0.0, 0.0]
         self.output.key(e.KEY_LEFTMETA, 1)
         self.output.button(e.BTN_RIGHT, 1)
-        threading.Thread(target=self._probe, daemon=True).start()
 
-    def _probe(self):
-        time.sleep(0.03)          # let COSMIC focus the window and start the resize
-        before = dict(self.watch.window)
-        self.output.move(PROBE, PROBE)
-        after = self.watch.wait_change(before, PROBE_WAIT)
-        self.output.move(-PROBE, -PROBE)
-        found = corner(before, after) if before.get('width') and after and after.get('width') else None
-        with self.lock:
-            if not self.active:
+    def _learn(self):
+        """Find the window and corner from what has moved so far."""
+        now = self.watch.windows
+        if self.target is None:
+            self.target = resized_window(self.before, now)
+            if self.target is None:
                 return
-            if found:
-                self.direction = (found[0] * before['width'], found[1] * before['height'])
-            self.probing = False
-            log.debug('resize: %s %s -> corner %s', before, after, found)
-            buffered, self.buffered = self.buffered, [0, 0]
-        if any(buffered):
-            self.motion(*buffered)
+            log.info('resize: %s', now[self.target].get('app_id'))
+        before, current = self.before[self.target], now.get(self.target)
+        if not current:
+            return
+        sx, sy = corner(before, current)
+        self.signs = (self.signs[0] or sx, self.signs[1] or sy)
+        if None not in self.signs:
+            self.direction = (self.signs[0] * before['width'], self.signs[1] * before['height'])
+            log.info('resize: corner %s, ratio %d:%d', self.signs, before['width'], before['height'])
 
     def motion(self, dx, dy):
         with self.lock:
-            if self.probing:
-                self.buffered[0] += dx
-                self.buffered[1] += dy
+            if not self.active:
                 return
-            if self.direction is None:      # the probe failed: resize freely
-                mx, my = dx, dy
+            if self.direction is None:
+                self._learn()
+            if self.direction is None:
+                mx, my = dx, dy       # not known yet: move freely
             else:
                 fx, fy = project(dx, dy, self.direction)
+                fy += self._correction()
                 fx, fy = fx + self.remainder[0], fy + self.remainder[1]
                 mx, my = round(fx), round(fy)
                 self.remainder = [fx - mx, fy - my]
         if mx or my:
             self.output.move(mx, my)
 
+    def _correction(self):
+        """Pointer counts to add to the vertical movement to bring the height back to the ratio."""
+        w = self.watch.windows.get(self.target)
+        if not w:
+            return 0
+        width0, height0 = self.direction[0] * self.signs[0], self.direction[1] * self.signs[1]
+        error = w['height'] - w['width'] * height0 / width0     # pixels too tall
+        return max(-MAX_CORRECTION, min(MAX_CORRECTION, -self.signs[1] * error * CORRECTION))
+
     def stop(self):
         with self.lock:
             if not self.active:
                 return
             self.active = False
+            if self.target and (w := self.watch.windows.get(self.target)):
+                log.info('resize: ended at %dx%d', w['width'], w['height'])
         self.output.button(e.BTN_RIGHT, 0)
         self.output.key(e.KEY_LEFTMETA, 0)

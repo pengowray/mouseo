@@ -2,7 +2,7 @@ import unittest
 from evdev import InputEvent, ecodes as e
 from naga_daemon import keys
 from naga_daemon.controls import Control
-from naga_daemon.resize import corner, project
+from naga_daemon.resize import corner, project, resized_window
 from naga_daemon.router import Router
 
 
@@ -14,6 +14,17 @@ class CornerTest(unittest.TestCase):
     def test_bottom_right(self):
         self.assertEqual(corner(win(10, 10, 800, 450), win(10, 10, 803, 453)), (1, 1))
 
+    def test_bottom_left(self):
+        self.assertEqual(corner(win(10, 10, 800, 450), win(7, 10, 803, 453)), (-1, 1))
+
+    def test_only_one_axis_moved_yet(self):
+        self.assertEqual(corner(win(10, 10, 800, 450), win(10, 10, 803, 450)), (1, None))
+
+    def test_resized_window_ignores_moves(self):
+        before = {'a': win(0, 0, 100, 100), 'b': win(0, 0, 200, 200)}
+        now = {'a': win(5, 5, 100, 100), 'b': win(0, 0, 210, 200)}
+        self.assertEqual(resized_window(before, now), 'b')
+
     def test_top_left(self):
         self.assertEqual(corner(win(10, 10, 800, 450), win(13, 13, 797, 447)), (-1, -1))
 
@@ -21,7 +32,7 @@ class CornerTest(unittest.TestCase):
         self.assertEqual(corner(win(10, 10, 800, 450), win(10, 13, 803, 447)), (1, -1))
 
     def test_nothing_moved(self):
-        self.assertIsNone(corner(win(10, 10, 800, 450), win(10, 10, 800, 450)))
+        self.assertEqual(corner(win(10, 10, 800, 450), win(10, 10, 800, 450)), (None, None))
 
     def test_project_onto_diagonal(self):
         fx, fy = project(10, 0, (16, 9))
