@@ -2,14 +2,15 @@
 
 Runs as its own process (GTK wants the main thread), started by pie.PieUI. Reads JSON lines
 on stdin and writes the hovered slot to stdout:
-  in:  {"op": "open", "slots": {"0": {"label", "icons", "level", "note"}, ...}, "centre": {...}}
+  in:  {"op": "open", "slots": {"0": {"label", "icons", "level", "note", "streams"}, ...}, "centre": {...}}
        {"op": "level", "slot": 0 | null, "level": 40}
        {"op": "close"}
   out: {"hover": 0 | null}      null means the centre (system volume)
 
 Slots are the eight directions, clockwise from up: 0 up, 2 right, 4 down, 6 left.
 The overlay covers each monitor so it can see the pointer. The pie appears once the pointer has
-moved SHOW_PX from where it was first seen, centred on that point.
+moved SHOW_PX from where it was first seen, centred on that point. Behind each app's wedge, a faint
+fill grows outward with how loud that app is right now.
 """
 import json, math, sys, threading
 import gi
@@ -17,6 +18,7 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
 from gi.repository import Gtk, Gdk, GLib, Gio, GtkLayerShell
 import cairo
+from .levels import Meters
 
 SHOW_PX = 25        # pointer movement that brings up the pie
 DEAD_PX = 45        # within this distance of the centre, the centre (system volume) is hovered
@@ -29,6 +31,9 @@ HOVER = (0.27, 0.55, 0.78, 0.95)
 TEXT = (1, 1, 1, 1)
 DIM = (1, 1, 1, 0.55)
 BAR = (0.40, 0.80, 0.45, 1)
+METER = (1, 1, 1, 0.13)
+METER_FALL = 0.06    # how far a meter drops per frame
+FRAME_MS = 33
 
 
 def slot_at(dx, dy):
@@ -48,6 +53,9 @@ class Pie:
         self.shown = False
         self.hover = None
         self.icons = {}
+        self.meters = Meters()
+        self.shown_levels = {}    # slot -> meter level being drawn, 0..1
+        self.ticker = None
         Gdk.Screen.get_default().connect('monitors-changed', lambda *_: self.rebuild())
         self.rebuild()
 
@@ -89,6 +97,10 @@ class Pie:
                 self.origin, self.pointer, self.shown, self.hover = None, None, False, None
                 for w in self.windows:
                     w.show_all()
+            self.meters.start(i for item in self.slots.values() for i in item.get('streams', []))
+            self.shown_levels = {}
+            if self.ticker is None:
+                self.ticker = GLib.timeout_add(FRAME_MS, self.tick)
             self.redraw()
         elif op == 'level':
             item = self.centre if msg.get('slot') is None else self.slots.get(msg['slot'])
@@ -99,7 +111,24 @@ class Pie:
             for w in self.windows:
                 w.hide()
             self.slots, self.centre = {}, None
+            self.stop_meters()
         return False
+
+    def tick(self):
+        """Meters jump up at once and fall back slowly."""
+        for slot, item in self.slots.items():
+            now = self.meters.level(item.get('streams', []))
+            self.shown_levels[slot] = max(now, self.shown_levels.get(slot, 0) - METER_FALL)
+        if self.shown:
+            self.redraw()
+        return True
+
+    def stop_meters(self):
+        self.meters.stop()
+        self.shown_levels = {}
+        if self.ticker is not None:
+            GLib.source_remove(self.ticker)
+            self.ticker = None
 
     # --- pointer
 
@@ -156,6 +185,14 @@ class Pie:
             return
         cr.set_source_rgba(*(HOVER if slot == self.hover else WEDGE))
         cr.fill()
+        level = self.shown_levels.get(slot, 0)
+        if level > 0.01:
+            inner = DEAD_PX + 4
+            cr.arc(cx, cy, inner + (OUTER - inner) * level, a0, a1)
+            cr.arc_negative(cx, cy, inner, a1, a0)
+            cr.close_path()
+            cr.set_source_rgba(*METER)
+            cr.fill()
         r = (OUTER + DEAD_PX) / 2 + 6
         x, y = cx + r * math.cos(mid), cy + r * math.sin(mid)
         self.draw_item(cr, x, y, item, icon=True)
@@ -260,6 +297,7 @@ def read_stdin(pie):
         except ValueError:
             continue
         GLib.idle_add(pie.command, msg)
+    GLib.idle_add(pie.stop_meters)
     GLib.idle_add(Gtk.main_quit)   # the daemon went away
 
 

@@ -30,7 +30,8 @@ class PieItem:
     note: str = ''
 
     def as_json(self):
-        return {'label': self.label, 'icons': self.icons, 'level': self.level, 'note': self.note}
+        return {'label': self.label, 'icons': self.icons, 'level': self.level, 'note': self.note,
+                'streams': self.streams}
 
 
 def _ignored(stream):
