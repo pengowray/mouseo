@@ -4,7 +4,7 @@ A control gets press() when its button goes down, wheel(up) per wheel step, butt
 middle click or a tilt (return True to swallow it), tap() if released without doing anything,
 and release() when the button comes up.
 """
-import logging, threading
+import logging, os, shutil, subprocess, threading
 from evdev import ecodes as e
 from . import audio, players
 from .monitors import BRIGHTNESS, COLOUR_PRESET, GAINS
@@ -136,6 +136,7 @@ class DpiControl(Control):
 
 class MonitorControl(Control):
     """Hold + wheel: brightness of the focused window's monitor. Hold + tilt left / right: warmer / cooler preset.
+    Hold + middle click: switch both monitors between night and day with monitor-night-light.
 
     `presets` maps a monitor serial to its colour presets, warmest first: [(value, name, gains), ...].
     `gains` is None, or (red, green, blue) to set after selecting the preset. Several entries can share
@@ -179,7 +180,26 @@ class MonitorControl(Control):
         if new != current:
             self.worker.set(m, BRIGHTNESS, new)
 
+    NIGHT_LIGHT = shutil.which('monitor-night-light') or os.path.expanduser('~/.local/bin/monitor-night-light')
+    NIGHT_LIGHT_STATE = os.path.join(os.environ.get('XDG_STATE_HOME') or os.path.expanduser('~/.local/state'),
+                                     'monitor-night-light')
+
+    def toggle_night(self):
+        try:
+            mode = dict(line.split('=', 1) for line in open(self.NIGHT_LIGHT_STATE).read().split()).get('mode')
+        except (OSError, ValueError):
+            mode = None
+        new = 'day' if mode == 'night' else 'night'
+        self.ctx.notifier.show('Monitors', 'Night: Warm 3' if new == 'night' else 'Day: 5000 K (LG 6500 K)')
+        subprocess.Popen([self.NIGHT_LIGHT, new], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        log.debug('monitor-night-light %s', new)
+        if self.monitor:
+            self.monitor.values.clear()  # re-read on the next press
+
     def button(self, code):
+        if code == MIDDLE:
+            self.toggle_night()
+            return True
         if code not in (TILT_LEFT, TILT_RIGHT):
             return False
         if not (m := self.ready()):

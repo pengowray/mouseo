@@ -6,6 +6,8 @@
 #   Thumb 2  (F19)  tap: middle click.   Hold + wheel: change DPI.
 #   Thumb 4  (Ro)   hold + wheel: brightness of the monitor with the focused window.
 #                   Hold + tilt left / right: warmer / cooler colour preset.
+#                   Hold + middle click: switch both monitors between night (Warm 3) and day
+#                   (5000 K, LG 6500 K), using monitor-night-light.
 #   Thumb 8  (F13)  hold + wheel: volume of the focused app.
 #   Thumb 9  (F14)  hold + wheel: Spotify volume.
 #   Thumb 7  (F17)  hold + wheel: volume of another app playing sound (not focused, not Spotify).

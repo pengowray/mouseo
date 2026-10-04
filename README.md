@@ -60,7 +60,7 @@ Only works through the USB receiver (product id `00b4`), not Bluetooth.
 | Thumb 1 | hold + wheel: screen zoom | Keypad Enter |
 | Thumb 2 | tap: middle click, hold + wheel: DPI | play/pause |
 | Thumb 3 | Ctrl+Home | nothing |
-| Thumb 4 | hold + wheel: monitor brightness, + tilt: colour preset | previous track |
+| Thumb 4 | hold + wheel: monitor brightness, + tilt: colour preset, + middle click: night/day | previous track |
 | Thumb 5 | Hyper | Hyper |
 | Thumb 6 | Ctrl+End | next track |
 | Thumb 7 | hold: background app's volume and media | nothing |
