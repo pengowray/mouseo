@@ -103,17 +103,17 @@ class ZoomControl(Control):
 
 
 class DpiControl(Control):
-    """Hold + wheel: DPI in fixed steps, shown at once and sent in the background. Tap: `tap_combo`."""
+    """Hold + wheel: DPI in fixed steps, shown at once and sent in the background. Tap: calls `on_tap`."""
 
-    def __init__(self, ctx, worker, lo, hi, step, tap_combo):
+    def __init__(self, ctx, worker, lo, hi, step, on_tap):
         self.ctx, self.worker = ctx, worker
         self.lo, self.hi, self.step = lo, hi, step
-        self.tap_combo = tap_combo
+        self.on_tap = on_tap
         self.shown = None
 
     def press(self):
         self.shown = None
-        self.worker.request(refresh=True)  # DPI may have changed on the mouse (Hyper + thumb 3 / 9)
+        self.worker.request(refresh=True)  # DPI may have changed elsewhere (e.g. Polychromatic)
 
     def wheel(self, up):
         current = self.shown or self.worker.current
@@ -130,4 +130,4 @@ class DpiControl(Control):
         log.debug('dpi %s -> %s', current, new)
 
     def tap(self):
-        self.ctx.output.tap(self.tap_combo)
+        self.on_tap()

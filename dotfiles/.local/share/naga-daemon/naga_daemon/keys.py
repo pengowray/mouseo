@@ -10,7 +10,7 @@ SPOTIFY = e.KEY_F14          # thumb 9
 BACKGROUND_APP = e.KEY_F17   # thumb 7
 SPEED = e.KEY_F15            # thumb 12
 FINE_SPEED = e.KEY_F16       # thumb 11
-DPI = e.KEY_F19              # thumb 3
+DPI = e.KEY_F19              # thumb 2
 ZOOM = e.KEY_F24             # thumb 1
 
 # Buttons that a held carrier can redirect

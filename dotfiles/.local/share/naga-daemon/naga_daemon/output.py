@@ -27,6 +27,11 @@ class Output:
             self.keyboard.write(e.EV_KEY, code, 0)
         self.keyboard.syn()
 
+    def click(self, code):
+        log.debug('click %s', key_name(code))
+        self.button(code, 1)
+        self.button(code, 0)
+
     def button(self, code, value):
         self.pointer.write(e.EV_KEY, code, value)
         self.pointer.syn()

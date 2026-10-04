@@ -13,12 +13,11 @@ from .router import Router
 
 log = logging.getLogger('naga_daemon')
 CONFIG = os.environ.get('NAGA_CONFIG') or os.path.expanduser('~/.config/naga/config.toml')
-CTRL_HOME = [e.KEY_LEFTCTRL, e.KEY_HOME]
 
 
 def build(config, focus):
     profiles = Profiles(config['profiles'])
-    output = Output(profiles.keys() | set(MEDIA_KEYS.values()) | set(ZoomControl.KEYS) | set(CTRL_HOME))
+    output = Output(profiles.keys() | set(MEDIA_KEYS.values()) | set(ZoomControl.KEYS))
     ctx = SimpleNamespace(focus=focus, profiles=profiles, output=output, notifier=Notifier())
     step = config['volume_step']
     controls = {
@@ -29,7 +28,8 @@ def build(config, focus):
             ('Background app volume', 'No other app is playing sound')),
         keys.SPEED: SpeedControl(ctx, fine=False),
         keys.FINE_SPEED: SpeedControl(ctx, fine=True),
-        keys.DPI: DpiControl(ctx, DpiWorker(), config['dpi_min'], config['dpi_max'], config['dpi_step'], CTRL_HOME),
+        keys.DPI: DpiControl(ctx, DpiWorker(), config['dpi_min'], config['dpi_max'], config['dpi_step'],
+                             on_tap=lambda: output.click(e.BTN_MIDDLE)),
         keys.ZOOM: ZoomControl(ctx),
     }
     ptt = getattr(e, config['push_to_talk'].upper(), None)

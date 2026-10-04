@@ -53,8 +53,8 @@ Only works through the USB receiver (product id `00b4`), not Bluetooth.
 | Wheel | scroll | volume |
 | Tilt left / right | Ctrl / push to talk | previous / next track |
 | Thumb 1 | hold + wheel: screen zoom | Keypad Enter |
-| Thumb 2 | middle click | play/pause |
-| Thumb 3 | tap: Ctrl+Home, hold + wheel: DPI | nothing |
+| Thumb 2 | tap: middle click, hold + wheel: DPI | play/pause |
+| Thumb 3 | Ctrl+Home | nothing |
 | Thumb 4 | Shift+Alt | previous track |
 | Thumb 5 | Hyper | Hyper |
 | Thumb 6 | Ctrl+End | next track |

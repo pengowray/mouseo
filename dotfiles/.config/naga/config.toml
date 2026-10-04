@@ -3,7 +3,7 @@
 #
 # The mouse sends these keys (set in ~/projects/mouseo/layout.py), and the daemon gives them their behaviour:
 #   Thumb 1  (F24)  hold + wheel: screen zoom (Super+= / Super+-).
-#   Thumb 3  (F19)  tap: Ctrl+Home.   Hold + wheel: change DPI.
+#   Thumb 2  (F19)  tap: middle click.   Hold + wheel: change DPI.
 #   Thumb 8  (F13)  hold + wheel: volume of the focused app.
 #   Thumb 9  (F14)  hold + wheel: Spotify volume.
 #   Thumb 7  (F17)  hold + wheel: volume of another app playing sound (not focused, not Spotify).
@@ -16,7 +16,7 @@
 # Keys are evdev key names without the KEY_ prefix, joined with "+": "shift+dot", "alt+left".
 # Leave a key out of a profile to do nothing in that app.
 
-dpi_step = 50                # DPI change per wheel step (thumb 3)
+dpi_step = 50                # DPI change per wheel step (thumb 2)
 dpi_min = 200                # the notification bar is empty at dpi_min and full at dpi_max
 dpi_max = 2400
 volume_step = 2              # percent per wheel step (thumbs 8 and 9)
