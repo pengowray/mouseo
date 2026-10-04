@@ -256,7 +256,7 @@ class Actions:
         if not app_id:
             self.notify('Background app volume', 'No other app is playing sound')
             return
-        label = app_id.rsplit('.', 1)[-1]
+        label = app_id.split(' (')[0] if ' ' in app_id else app_id.rsplit('.', 1)[-1]  # 'VLC media player (LibVLC 3.0)', 'com.google.Chrome'
         if not streams:
             self.notify(f'{label} volume', 'This app is not playing any sound')
             return
