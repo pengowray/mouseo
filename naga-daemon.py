@@ -214,15 +214,42 @@ class Actions:
         return self.background_app
 
     def find_background_app(self):
-        """An app with audio that is not focused and is not Spotify. Apps playing sound come first."""
+        """An app with audio that is not focused and is not Spotify.
+
+        Apps whose media controls say they are playing come first (this updates the moment you
+        press pause), then apps with an active audio stream, then apps with paused audio.
+        """
         skip = {normalize(self.focus.app_id), 'spotify'}
-        for stream in sorted(self.list_streams(), key=lambda s: bool(s.get('corked'))):
+        out = subprocess.run(['playerctl', '-a', 'metadata', '--format', '{{playerName}}|{{status}}'],
+                             capture_output=True, text=True).stdout
+        playing = {normalize(line.split('|')[0]) for line in out.splitlines() if line.endswith('|Playing')}
+
+        def rank(stream):
+            names = self.stream_names(stream)
+            if any(n in p or p in n for n in names for p in playing):
+                return 0
+            return 2 if stream.get('corked') else 1
+
+        for stream in sorted(self.list_streams(), key=rank):
             props = stream.get('properties', {})
-            name = props.get('application.process.binary') or props.get('application.name', '')
-            n = normalize(name)
-            if len(n) >= 3 and not any(n in k or k in n for k in skip if k) and 'speechdispatcher' not in normalize(props.get('application.name', '')):
-                return props.get('application.name') or name
+            names = self.stream_names(stream)
+            if not names or any(n in k or k in n for n in names for k in skip if k):
+                continue
+            if any('speechdispatcher' in n for n in names):
+                continue
+            app = props.get('application.name') or props.get('application.process.binary')
+            if VERBOSE:
+                log('background app:', app, 'rank', rank(stream))
+            return app
         return None
+
+    @staticmethod
+    def stream_names(stream):
+        props = stream.get('properties', {})
+        names = {normalize(props.get(k, '')) for k in (
+            'application.name', 'application.process.binary', 'application.id',
+            'pipewire.access.portal.app_id', 'application.icon_name')}
+        return {n for n in names if len(n) >= 3}
 
     def press(self, carrier):
         if carrier == F19:
@@ -295,11 +322,7 @@ class Actions:
         want = normalize(app_id)
         found = []
         for stream in self.list_streams():
-            props = stream.get('properties', {})
-            names = {normalize(props.get(k, '')) for k in (
-                'application.name', 'application.process.binary', 'application.id',
-                'pipewire.access.portal.app_id', 'application.icon_name')}
-            if any(len(n) >= 3 and (n in want or want in n) for n in names):
+            if any(n in want or want in n for n in self.stream_names(stream)):
                 found.append(str(stream['index']))
         return found
 
