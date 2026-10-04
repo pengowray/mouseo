@@ -16,8 +16,7 @@ class Router:
         self.push_to_talk = push_to_talk  # callable(value), or None to pass F18 through
         self.held = None                  # carrier key code being held
         self.used = False                 # whether anything happened during this hold
-        self.swallowed = {}               # (source, code) of presses whose release must be dropped too -> control
-        self.motion = [0, 0]              # pointer movement captured since the last sync event
+        self.swallowed = set()            # (source, code) of presses whose release must be dropped too
 
     def handle(self, source, ev):
         if ev.type == e.EV_KEY and ev.code in self.controls:
@@ -28,32 +27,23 @@ class Router:
         if control and ev.type == e.EV_KEY and ev.value == 1:
             self.used = True  # pressing anything else during a hold means it wasn't a tap
 
-        if ev.type == e.EV_REL:
-            if control and ev.code == e.REL_WHEEL:
+        if control and ev.type == e.EV_REL:
+            if ev.code == e.REL_WHEEL:
                 self.used = True
                 for _ in range(abs(ev.value)):
                     control.wheel(ev.value > 0)
                 return True
-            if control and ev.code == e.REL_WHEEL_HI_RES:
-                return True
-            if control and ev.code in (e.REL_X, e.REL_Y) and control.capturing():
-                self.motion[ev.code == e.REL_Y] += ev.value
+            if ev.code == e.REL_WHEEL_HI_RES:
                 return True
 
-        if ev.type == e.EV_SYN and any(self.motion):
-            if control and control.capturing():
-                control.motion(*self.motion)
-            self.motion = [0, 0]
-
-        if ev.type == e.EV_KEY:
+        if ev.type == e.EV_KEY and ev.code in REDIRECTABLE:
             key = (source, ev.code)
-            redirect = ev.code in REDIRECTABLE or (control and ev.code in control.extra_buttons)
-            if ev.value == 1 and control and redirect and control.button(ev.code):
-                self.swallowed[key] = control
+            if ev.value == 1 and control and control.button(ev.code):
+                self.swallowed.add(key)
                 return True
             if key in self.swallowed:
                 if ev.value == 0:
-                    self.swallowed.pop(key).button_up(ev.code)
+                    self.swallowed.discard(key)
                 return True
             if ev.code == TILT_RIGHT and self.push_to_talk:
                 if ev.value in (0, 1):

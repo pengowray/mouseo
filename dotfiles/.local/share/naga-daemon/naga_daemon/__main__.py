@@ -10,7 +10,6 @@ from .monitors import MonitorWorker
 from .notify import Notifier
 from .output import Output
 from .pie import PieControl, PieUI, VOLUME_KEYS
-from .resize import ProportionalResize, WindowWatch
 from .profiles import Profiles
 from .router import Router
 
@@ -25,11 +24,9 @@ def build(config, focus):
     step = config['volume_step']
     pie_ui = PieUI()
     pie_ui.start()
-    watch = WindowWatch()
-    watch.start()
     controls = {
         keys.PIE: PieControl(ctx, pie_ui, step),
-        keys.WINDOW: WindowControl(ctx, ProportionalResize(output, watch)),
+        keys.WINDOW: WindowControl(ctx),
         keys.FOCUSED_APP: AppControl(ctx, lambda: focus.app_id, step, ('App volume', 'No window is focused')),
         keys.SPOTIFY: AppControl(ctx, lambda: 'spotify', step),
         keys.SPEED: SpeedControl(ctx, fine=False),

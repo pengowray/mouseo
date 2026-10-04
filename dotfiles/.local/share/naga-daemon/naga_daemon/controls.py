@@ -2,7 +2,7 @@
 
 A control gets press() when its button goes down, wheel(up) per wheel step, button(code) for
 middle click or a tilt (return True to swallow it), tap() if released without doing anything,
-and release() when the button comes up. See Control for the rest.
+and release() when the button comes up.
 """
 import logging, os, shutil, subprocess, threading
 from evdev import ecodes as e
@@ -18,14 +18,9 @@ MEDIA_KEYS = {MIDDLE: e.KEY_PLAYPAUSE, TILT_LEFT: e.KEY_PREVIOUSSONG, TILT_RIGHT
 
 
 class Control:
-    extra_buttons = frozenset()   # buttons besides middle click and the tilts that button() gets
-
     def press(self): pass
     def wheel(self, up): pass
     def button(self, code): return False
-    def button_up(self, code): pass   # a button that button() swallowed was released
-    def capturing(self): return False # True to get pointer movement through motion() instead of passing it on
-    def motion(self, dx, dy): pass
     def tap(self): pass
     def release(self): pass
 
@@ -110,38 +105,19 @@ class ZoomControl(Control):
 
 class WindowControl(Control):
     """Hold + tilt right / left: keep the focused window on top or stop.
-    Hold + right drag: resize the window and keep its proportions (resize.py).
 
     COSMIC has no "always on top", so this uses sticky: the window floats above the others
     and shows on every workspace.
     """
 
-    extra_buttons = frozenset({e.BTN_RIGHT})
-
-    def __init__(self, ctx, resize):
-        self.ctx, self.resize = ctx, resize
+    def __init__(self, ctx):
+        self.ctx = ctx
 
     def button(self, code):
-        if code == e.BTN_RIGHT:
-            self.resize.start()
-            return True
         if code not in (TILT_LEFT, TILT_RIGHT):
             return False
         threading.Thread(target=self._set, args=(code == TILT_RIGHT,), daemon=True).start()
         return True
-
-    def button_up(self, code):
-        if code == e.BTN_RIGHT:
-            self.resize.stop()
-
-    def capturing(self):
-        return self.resize.active
-
-    def motion(self, dx, dy):
-        self.resize.motion(dx, dy)
-
-    def release(self):
-        self.resize.stop()
 
     def _set(self, on):
         app = self.ctx.focus.set_sticky(on)
