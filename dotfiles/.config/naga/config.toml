@@ -68,6 +68,7 @@ forward = "right"
 play_pause = "playpause"
 
 # Colour presets for thumb 4 + tilt, warmest first, by monitor serial number.
+# An entry can add gains = [red, green, blue] (0-100), set after selecting the preset.
 # List a monitor's presets with: ddcutil --sn SERIAL capabilities  (feature 14)
 # monitor-night-light also sets these presets at 22:30 and 06:00.
 
@@ -79,7 +80,13 @@ colour_presets = [
 ]
 
 [monitors.UHB1733028185]     # Philips 271S7Q, DP-2
+# The Warm steps imitate the monitor's LowBlue Mode, which can't be switched over DDC/CI:
+# preset User 1 (0x0b) with red, green and blue gains. Turn LowBlue off in the monitor's menu,
+# or it blocks all preset changes.
 colour_presets = [
+    { value = 0x0b, name = "Warm 3", gains = [100, 78, 45] },
+    { value = 0x0b, name = "Warm 2", gains = [100, 86, 62] },
+    { value = 0x0b, name = "Warm 1", gains = [100, 93, 78] },
     { value = 0x04, name = "5000 K" },
     { value = 0x05, name = "6500 K" },
     { value = 0x06, name = "7500 K" },

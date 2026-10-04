@@ -43,3 +43,16 @@ class MonitorParsingTest(unittest.TestCase):
         from naga_daemon.monitors import parse_getvcp
         self.assertEqual(parse_getvcp('VCP 10 C 70 100\nVCP 14 CNC x00 x0b x00 x06\n'), {0x10: 70, 0x14: 6})
         self.assertEqual(parse_getvcp('VCP 14 SNC x05'), {0x14: 5})
+
+
+class PresetPositionTest(unittest.TestCase):
+    def test_current_index_matches_gains(self):
+        from types import SimpleNamespace
+        from naga_daemon.controls import MonitorControl
+        presets = [(0x0b, 'Warm 2', [100, 86, 62]), (0x0b, 'Warm 1', [100, 93, 78]), (0x04, '5000 K', None)]
+        m = SimpleNamespace(values={0x14: 0x0b, 0x16: 100, 0x18: 93, 0x1a: 78})
+        self.assertEqual(MonitorControl.current_index(m, presets), 1)
+        m.values = {0x14: 0x04}
+        self.assertEqual(MonitorControl.current_index(m, presets), 2)
+        m.values = {0x14: 0x0b, 0x16: 50, 0x18: 50, 0x1a: 50}   # User 1 with other gains
+        self.assertEqual(MonitorControl.current_index(m, presets), 1)

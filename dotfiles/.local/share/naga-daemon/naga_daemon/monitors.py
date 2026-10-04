@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 
 log = logging.getLogger(__name__)
 BRIGHTNESS, COLOUR_PRESET = 0x10, 0x14
+GAINS = (0x16, 0x18, 0x1a)   # red, green, blue video gain (used by the User presets)
+READ = (BRIGHTNESS, COLOUR_PRESET, *GAINS)
 
 
 @dataclass
@@ -88,8 +90,8 @@ class MonitorWorker(threading.Thread):
                 self._ddcutil(bus, 'setvcp', f'{feature:x}', str(value), '--noverify')
             for bus in to_read:
                 monitor = next(m for m in self.monitors if m.bus == bus)
-                values = parse_getvcp(self._ddcutil(bus, 'getvcp', f'{BRIGHTNESS:x}', f'{COLOUR_PRESET:x}', '--brief'))
-                for missing in {BRIGHTNESS, COLOUR_PRESET} - set(values):  # reads fail now and then; retry once
+                values = parse_getvcp(self._ddcutil(bus, 'getvcp', *(f'{f:x}' for f in READ), '--brief'))
+                for missing in set(READ) - set(values):  # reads fail now and then; retry once
                     values.update(parse_getvcp(self._ddcutil(bus, 'getvcp', f'{missing:x}', '--brief')))
                 for feature, value in values.items():
                     if (bus, feature) not in self.pending:  # don't undo a change made while reading

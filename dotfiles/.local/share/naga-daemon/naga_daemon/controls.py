@@ -7,7 +7,7 @@ and release() when the button comes up.
 import logging, threading
 from evdev import ecodes as e
 from . import audio, players
-from .monitors import BRIGHTNESS, COLOUR_PRESET
+from .monitors import BRIGHTNESS, COLOUR_PRESET, GAINS
 from .keys import MIDDLE, TILT_LEFT, TILT_RIGHT
 from .util import bar, app_label
 
@@ -137,7 +137,9 @@ class DpiControl(Control):
 class MonitorControl(Control):
     """Hold + wheel: brightness of the focused window's monitor. Hold + tilt left / right: warmer / cooler preset.
 
-    `presets` maps a monitor serial to its colour presets, warmest first: [(value, name), ...].
+    `presets` maps a monitor serial to its colour presets, warmest first: [(value, name, gains), ...].
+    `gains` is None, or (red, green, blue) to set after selecting the preset. Several entries can share
+    a preset (User 1) with different gains, to give warmer steps than the monitor's own presets.
     """
 
     def __init__(self, ctx, worker, step, presets):
@@ -187,11 +189,20 @@ class MonitorControl(Control):
         if not presets:
             self.ctx.notifier.show(title, 'No colour presets for this monitor in config.toml')
             return True
-        values = [v for v, _ in presets]
-        current = m.values.get(COLOUR_PRESET)
-        i = values.index(current) if current in values else len(values) // 2
-        i = max(0, i - 1) if code == TILT_LEFT else min(len(values) - 1, i + 1)
-        self.ctx.notifier.show(title, f'{bar(i, 0, len(values) - 1)}  {presets[i][1]}')
-        if values[i] != current:
-            self.worker.set(m, COLOUR_PRESET, values[i])
+        i = self.current_index(m, presets)
+        i = max(0, i - 1) if code == TILT_LEFT else min(len(presets) - 1, i + 1)
+        value, name, gains = presets[i]
+        self.ctx.notifier.show(title, f'{bar(i, 0, len(presets) - 1)}  {name}')
+        if value != m.values.get(COLOUR_PRESET) or gains:
+            self.worker.set(m, COLOUR_PRESET, value)
+        for feature, gain in zip(GAINS, gains or ()):
+            self.worker.set(m, feature, gain)
         return True
+
+    @staticmethod
+    def current_index(m, presets):
+        """Where the monitor is in the list. Unknown settings count as the middle of the list."""
+        current = m.values.get(COLOUR_PRESET)
+        gains = tuple(m.values.get(f) for f in GAINS)
+        matches = [i for i, (value, _, g) in enumerate(presets) if value == current and (g is None or tuple(g) == gains)]
+        return matches[0] if matches else len(presets) // 2

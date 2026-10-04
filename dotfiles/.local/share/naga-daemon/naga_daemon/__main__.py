@@ -33,7 +33,7 @@ def build(config, focus):
                              on_tap=lambda: output.click(e.BTN_MIDDLE)),
         keys.ZOOM: ZoomControl(ctx),
         keys.MONITOR: MonitorControl(ctx, MonitorWorker(), config['brightness_step'], {
-            serial: [(p['value'], p['name']) for p in m['colour_presets']]
+            serial: [(p['value'], p['name'], p.get('gains')) for p in m['colour_presets']]
             for serial, m in config.get('monitors', {}).items()}),
     }
     ptt = getattr(e, config['push_to_talk'].upper(), None)
