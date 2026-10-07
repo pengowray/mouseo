@@ -92,15 +92,22 @@ class SpeedControl(Control):
 
 
 class ZoomControl(Control):
-    """Hold + wheel: COSMIC screen zoom (Super+= / Super+-)."""
+    """Hold + wheel: COSMIC screen zoom (Super+= / Super+-).
+    Hold + tilt left / right: the app's zoom out / in (Ctrl+- / Ctrl+=). Hold + middle click: reset it (Ctrl+0).
+    """
 
-    KEYS = [e.KEY_LEFTMETA, e.KEY_EQUAL, e.KEY_MINUS]
+    APP_ZOOM = {TILT_LEFT: e.KEY_MINUS, TILT_RIGHT: e.KEY_EQUAL, MIDDLE: e.KEY_0}
+    KEYS = [e.KEY_LEFTMETA, e.KEY_LEFTCTRL, e.KEY_EQUAL, e.KEY_MINUS, e.KEY_0]
 
     def __init__(self, ctx):
         self.ctx = ctx
 
     def wheel(self, up):
         self.ctx.output.tap([e.KEY_LEFTMETA, e.KEY_EQUAL if up else e.KEY_MINUS])
+
+    def button(self, code):
+        self.ctx.output.tap([e.KEY_LEFTCTRL, self.APP_ZOOM[code]])
+        return True
 
 
 class WindowControl(Control):

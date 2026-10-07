@@ -3,6 +3,8 @@
 #
 # The mouse sends these keys (set in ~/projects/mouseo/layout.py), and the daemon gives them their behaviour:
 #   Thumb 1  (F24)  hold + wheel: screen zoom (Super+= / Super+-).
+#                   Hold + tilt left / right: zoom the app out / in (Ctrl+- / Ctrl+=).
+#                   Hold + middle click: reset the app's zoom (Ctrl+0).
 #   Thumb 2  (F19)  tap: middle click.   Hold + wheel: change DPI.
 #   Thumb 4  (Ro)   hold + wheel: brightness of the monitor with the focused window.
 #                   Hold + tilt left / right: warmer / cooler colour preset.

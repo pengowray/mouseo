@@ -56,3 +56,15 @@ class PresetPositionTest(unittest.TestCase):
         self.assertEqual(MonitorControl.current_index(m, presets), 2)
         m.values = {0x14: 0x0b, 0x16: 50, 0x18: 50, 0x1a: 50}   # User 1 with other gains
         self.assertEqual(MonitorControl.current_index(m, presets), 1)
+
+
+class ZoomControlTest(unittest.TestCase):
+    def test_tilts_and_middle_click_zoom_the_app(self):
+        from types import SimpleNamespace
+        from naga_daemon.controls import ZoomControl
+        from naga_daemon.keys import MIDDLE, TILT_LEFT, TILT_RIGHT
+        sent = []
+        zoom = ZoomControl(SimpleNamespace(output=SimpleNamespace(tap=sent.append)))
+        self.assertTrue(all(zoom.button(c) for c in (TILT_LEFT, TILT_RIGHT, MIDDLE)))
+        self.assertEqual(sent, [[e.KEY_LEFTCTRL, e.KEY_MINUS], [e.KEY_LEFTCTRL, e.KEY_EQUAL], [e.KEY_LEFTCTRL, e.KEY_0]])
+        self.assertTrue({k for combo in sent for k in combo} <= set(ZoomControl.KEYS))
