@@ -104,7 +104,9 @@ class PieUI:
                 self.hover = json.loads(line).get('hover')
             except ValueError:
                 pass
-        log.warning('volume pie exited with code %s', proc.wait())
+        code = proc.wait()
+        if proc is self.proc:     # not stopped on purpose by stop()
+            log.warning('volume pie exited with code %s', code)
 
     def send(self, msg):
         with self.lock:
@@ -119,6 +121,16 @@ class PieUI:
     def start(self):
         with self.lock:
             self._ensure()
+
+    def stop(self):
+        """End the pie process. The next send() starts a new one. Returns True if one was running."""
+        with self.lock:
+            proc, self.proc = self.proc, None
+            self.started, self.hover = 0.0, None
+        if proc and proc.poll() is None:
+            proc.terminate()
+            return True
+        return False
 
     def open(self, slots, centre):
         self.send({'op': 'open', 'slots': {str(k): v.as_json() for k, v in slots.items()}, 'centre': centre})

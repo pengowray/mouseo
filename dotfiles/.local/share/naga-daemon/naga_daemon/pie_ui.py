@@ -63,7 +63,9 @@ class Pie:
         for w in self.windows:
             w.destroy()
         display = Gdk.Display.get_default()
-        self.windows = [self.make_window(display.get_monitor(i)) for i in range(display.get_n_monitors())]
+        monitors = [display.get_monitor(i) for i in range(display.get_n_monitors())]
+        log('monitors: ' + (', '.join(describe(m) for m in monitors) or 'none'))
+        self.windows = [self.make_window(m) for m in monitors]
 
     def make_window(self, monitor):
         w = Gtk.Window()
@@ -84,6 +86,7 @@ class Pie:
         w.connect('draw', self.draw)
         w.connect('motion-notify-event', self.moved)
         w.connect('enter-notify-event', self.moved)
+        w.connect('delete-event', lambda *_: log(f'the desktop closed the window on {describe(monitor)}'))
         return w
 
     # --- commands from the daemon
@@ -272,6 +275,16 @@ class Pie:
 
 def normalize(name):
     return ''.join(ch for ch in name.lower() if ch.isalnum())
+
+
+def log(text):
+    """To the daemon's journal. stdout is for the daemon."""
+    print(f'volume pie: {text}', file=sys.stderr, flush=True)
+
+
+def describe(monitor):
+    g = monitor.get_geometry()
+    return f'{monitor.get_model() or "?"} {g.width}x{g.height} at {g.x},{g.y}'
 
 
 _apps = None

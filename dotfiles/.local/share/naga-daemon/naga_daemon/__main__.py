@@ -12,17 +12,17 @@ from .output import Output
 from .pie import PieControl, PieUI, VOLUME_KEYS
 from .profiles import Profiles
 from .router import Router
+from .sleep import SleepWatch
 
 log = logging.getLogger('naga_daemon')
 CONFIG = os.environ.get('NAGA_CONFIG') or os.path.expanduser('~/.config/naga/config.toml')
 
 
-def build(config, focus):
+def build(config, focus, pie_ui):
     profiles = Profiles(config['profiles'])
     output = Output(profiles.keys() | set(MEDIA_KEYS.values()) | set(ZoomControl.KEYS) | set(VOLUME_KEYS))
     ctx = SimpleNamespace(focus=focus, profiles=profiles, output=output, notifier=Notifier())
     step = config['volume_step']
-    pie_ui = PieUI()
     pie_ui.start()
     controls = {
         keys.PIE: PieControl(ctx, pie_ui, step),
@@ -62,13 +62,19 @@ async def main():
     if not devices:
         sys.exit('Mouse not found')  # systemd restarts us, so this also waits for a Bluetooth reconnect
     focus = Focus()
+    pie_ui = PieUI()
     try:
-        router = build(config, focus)
+        router = build(config, focus, pie_ui)
     except (KeyError, ValueError) as err:
         sys.exit(f'{CONFIG}: {err}')
     readers = [asyncio.create_task(forward(d, router)) for d in devices]
     log.info('grabbed %s', ', '.join(f'{d.path} ({d.phys})' for d in devices))
     asyncio.create_task(focus.run())
+
+    def on_sleep(sleeping):
+        if pie_ui.stop():
+            log.info('%s: stopped the volume pie; thumb 5 starts a new one', 'going to sleep' if sleeping else 'woke up')
+    asyncio.create_task(SleepWatch(on_sleep).run())
     done, _ = await asyncio.wait(readers, return_when=asyncio.FIRST_COMPLETED)
     for task in done:
         task.result()  # raises if a device disappeared

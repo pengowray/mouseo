@@ -37,6 +37,15 @@ class PartsTest(unittest.TestCase):
                                                 {'app_id': 'firefox', 'state': ['maximized', 'activated']}]}}})
         self.assertEqual(f.app_id, 'firefox')
 
+    def test_sleep_signal(self):
+        from naga_daemon.sleep import parse
+        line = '/org/freedesktop/login1: org.freedesktop.login1.Manager.PrepareForSleep ({},)\n'
+        self.assertIs(parse(line.format('true')), True)
+        self.assertIs(parse(line.format('false')), False)
+        self.assertIsNone(parse('/org/freedesktop/login1: org.freedesktop.login1.Manager.SessionNew '
+                                "('3', objectpath '/org/freedesktop/login1/session/_33')\n"))
+        self.assertIsNone(parse('Monitoring signals on object /org/freedesktop/login1 owned by org.freedesktop.login1\n'))
+
 
 class MonitorParsingTest(unittest.TestCase):
     def test_parse_getvcp(self):
