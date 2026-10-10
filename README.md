@@ -43,8 +43,10 @@ python3 apply.py           # show differences
 python3 apply.py --write   # write them
 ```
 
-Writing needs access to the receiver's hidraw device. The dotfiles' udev rule grants it to
-the logged-in user; without it, run with `sudo` or `sudo chmod a+rw /dev/hidrawN`.
+Reading and writing the button layout needs access to the receiver's hidraw device. The
+dotfiles' udev rule grants that access to the user logged in at the local desktop. A plain
+`chezmoi apply` installs the rule; `chezmoi apply <path>` does not. If `apply.py` cannot
+open the device, the error message lists the commands to run.
 
 Only works through the USB receiver (product id `00b4`), not Bluetooth.
 

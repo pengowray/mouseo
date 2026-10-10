@@ -11,6 +11,7 @@ import qdrazer.protocol as pt
 
 VID, PID = 0x1532, 0x00B4
 REPORT_LEN = 91  # report id byte + 90-byte Razer report
+UDEV_RULE = '/etc/udev/rules.d/70-razer-naga.rules'  # installed by the chezmoi dotfiles
 
 
 def _ioc(nr, size):
@@ -31,13 +32,30 @@ def find_control_hidraw():
     sys.exit('Naga V2 HyperSpeed receiver not found')
 
 
+def permission_help(path):
+    prog = os.path.basename(sys.argv[0])
+    if not os.path.exists(UDEV_RULE):
+        return (f'Cannot open {path}: permission denied.\n'
+                f'The udev rule {UDEV_RULE} is not installed.\n'
+                'To install the rule, run chezmoi apply with no paths.\n'
+                'Or, for access until the receiver is unplugged or the PC restarts, run:\n'
+                f'  sudo chmod a+rw {path}')
+    return (f'Cannot open {path}: permission denied.\n'
+            f'The udev rule {UDEV_RULE} is installed.\n'
+            f'1. Reload udev, then run {prog} again:\n'
+            '     sudo udevadm control --reload && sudo udevadm trigger\n'
+            f'2. Over SSH, or if access is still denied, run {prog} with sudo.\n'
+            '   Or, for access until the receiver is unplugged or the PC restarts, run:\n'
+            f'     sudo chmod a+rw {path}')
+
+
 class Naga:
     def __init__(self, path=None):
         self.path = path or find_control_hidraw()
         try:
             self.fd = os.open(self.path, os.O_RDWR)
         except PermissionError:
-            sys.exit(f'No permission for {self.path}. Run: sudo chmod a+rw {self.path}')
+            sys.exit(permission_help(self.path))
 
     def transact(self, command, args=b'', size=None):
         """Send one command and return the response arguments. Raises on failure."""
