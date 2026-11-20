@@ -9,7 +9,7 @@ from .focus import Focus
 from .monitors import MonitorWorker
 from .notify import Notifier
 from .output import Output
-from .pie import PieControl, PieUI, VOLUME_KEYS
+from .pie import PieControl, PieUI
 from .profiles import Profiles
 from .router import Router
 from .sleep import SleepWatch
@@ -20,7 +20,7 @@ CONFIG = os.environ.get('NAGA_CONFIG') or os.path.expanduser('~/.config/naga/con
 
 def build(config, focus, pie_ui):
     profiles = Profiles(config['profiles'])
-    output = Output(profiles.keys() | set(MEDIA_KEYS.values()) | set(ZoomControl.KEYS) | set(VOLUME_KEYS))
+    output = Output(profiles.keys() | set(MEDIA_KEYS.values()) | set(ZoomControl.KEYS))
     ctx = SimpleNamespace(focus=focus, profiles=profiles, output=output, notifier=Notifier())
     step = config['volume_step']
     pie_ui.start()
@@ -58,7 +58,7 @@ async def main():
     with open(CONFIG, 'rb') as f:
         config = tomllib.load(f)
     devices = [evdev.InputDevice(p) for p in evdev.list_devices()]
-    devices = [d for d in devices if keys.DEVICE_NAME in d.name and not d.name.startswith(keys.OUR_PREFIX)]
+    devices = [d for d in devices if keys.is_naga(d.name) and not d.name.startswith(keys.OUR_PREFIX)]
     if not devices:
         sys.exit('Mouse not found')  # systemd restarts us, so this also waits for a Bluetooth reconnect
     focus = Focus()

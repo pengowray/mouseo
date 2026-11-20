@@ -53,6 +53,20 @@ class MonitorParsingTest(unittest.TestCase):
         self.assertEqual(parse_getvcp('VCP 10 C 70 100\nVCP 14 CNC x00 x0b x00 x06\n'), {0x10: 70, 0x14: 6})
         self.assertEqual(parse_getvcp('VCP 14 SNC x05'), {0x14: 5})
 
+    def test_detect_uses_backlight_for_laptop_panel(self):
+        from unittest import mock
+        from types import SimpleNamespace
+        from naga_daemon import monitors
+        out = ('Invalid display\n   I2C bus:          /dev/i2c-10\n   DRM connector:    card0-eDP-1\n'
+               '   Monitor:          CMN::\n\n'
+               'Display 1\n   I2C bus:  /dev/i2c-5\n   DRM connector:           card0-DP-1\n'
+               '   Monitor:                 GSM:LG ULTRAGEAR:304NTJJ4A468\n')
+        with mock.patch.object(monitors.subprocess, 'run', return_value=SimpleNamespace(stdout=out)), \
+             mock.patch.object(monitors, 'backlights', return_value=['intel_backlight']):
+            found = monitors.detect()
+        self.assertEqual([(m.connector, m.bus, m.model, m.backlight) for m in found],
+                         [('DP-1', 5, 'LG ULTRAGEAR', None), ('eDP-1', None, 'Laptop screen', 'intel_backlight')])
+
 
 class PresetPositionTest(unittest.TestCase):
     def test_current_index_matches_gains(self):

@@ -55,6 +55,14 @@ def volume_of(indexes):
     return max(levels) if levels else None
 
 
+def change_system_volume(up):
+    """Step the default output's volume by COSMIC's volume step, showing COSMIC's volume popup.
+    This is the call COSMIC makes for the volume keys; tapping the keys instead adds ~300 ms."""
+    subprocess.run(['busctl', '--user', 'call', 'com.system76.CosmicSettingsDaemon',
+                    '/com/system76/CosmicSettingsDaemon', 'com.system76.CosmicSettingsDaemon',
+                    'VolumeUp' if up else 'VolumeDown'], capture_output=True)
+
+
 def system_volume():
     """The default output's volume in percent, or None."""
     out = subprocess.run(['pactl', 'get-sink-volume', '@DEFAULT_SINK@'], capture_output=True, text=True).stdout

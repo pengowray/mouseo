@@ -17,7 +17,6 @@ log = logging.getLogger(__name__)
 
 UP, DOWN = 0, 4
 OTHER_SLOTS = (2, 6, 1, 7, 3, 5)    # right, left, then the diagonals
-VOLUME_KEYS = [e.KEY_VOLUMEUP, e.KEY_VOLUMEDOWN]
 
 
 @dataclass
@@ -175,18 +174,14 @@ class PieControl(Control):
     def wheel(self, up):
         item = self.target()
         if item is None:
-            self.ctx.output.tap([VOLUME_KEYS[0] if up else VOLUME_KEYS[1]])
-            threading.Thread(target=self._show_system_level, daemon=True).start()
+            audio.change_system_volume(up)
+            self.ui.level(None, audio.system_volume())
             return
         if not item.streams:
             return                # the pie already says "No sound"
         audio.change_volume(item.streams, self.step if up else -self.step)
         item.level = audio.volume_of(item.streams)
         self.ui.level(self.ui.hover, item.level)
-
-    def _show_system_level(self):
-        time.sleep(0.05)          # let the desktop apply the volume key first
-        self.ui.level(None, audio.system_volume())
 
     def button(self, code):
         item = self.target()

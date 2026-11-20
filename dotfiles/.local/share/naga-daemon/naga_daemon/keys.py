@@ -1,7 +1,12 @@
 """Keys the onboard layout sends (see ~/projects/mouseo/layout.py), and key names in the config."""
 from evdev import ecodes as e
 
-DEVICE_NAME = 'Naga V2 HyperSpeed'
+# The USB receiver calls the mouse 'Naga V2 HyperSpeed'; over Bluetooth it is 'Naga V2 HS'.
+DEVICE_NAMES = ('Naga V2 HyperSpeed', 'Naga V2 HS')
+
+
+def is_naga(name):
+    return any(n in name for n in DEVICE_NAMES)
 OUR_PREFIX = 'naga-daemon'   # name prefix of our own virtual devices, so we never grab them
 
 # Carrier keys sent by held thumb buttons

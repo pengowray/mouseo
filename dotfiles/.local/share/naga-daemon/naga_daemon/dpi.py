@@ -1,5 +1,5 @@
 import logging, threading
-from .keys import DEVICE_NAME
+from .keys import is_naga
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class DpiWorker(threading.Thread):
             try:
                 if mouse is None:
                     from openrazer.client import DeviceManager
-                    mouse = next((d for d in DeviceManager().devices if DEVICE_NAME in d.name), None)
+                    mouse = next((d for d in DeviceManager().devices if is_naga(d.name)), None)
                     if mouse is None:
                         raise LookupError('mouse not found in OpenRazer')
                 if wanted is not None:
