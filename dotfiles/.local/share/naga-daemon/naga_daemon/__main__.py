@@ -4,8 +4,8 @@ import evdev
 from evdev import ecodes as e
 from . import keys
 from .controls import AppControl, SpeedControl, ZoomControl, DpiControl, MonitorControl, WindowControl, MEDIA_KEYS
+from . import desktop as desktops
 from .dpi import DpiWorker
-from .focus import Focus
 from .monitors import MonitorWorker
 from .notify import Notifier
 from .output import Output
@@ -18,11 +18,14 @@ log = logging.getLogger('naga_daemon')
 CONFIG = os.environ.get('NAGA_CONFIG') or os.path.expanduser('~/.config/naga/config.toml')
 
 
-def build(config, focus, pie_ui):
+def build(config, desktop_name, pie_ui):
     profiles = Profiles(config['profiles'])
-    output = Output(profiles.keys() | set(MEDIA_KEYS.values()) | set(ZoomControl.KEYS))
-    ctx = SimpleNamespace(focus=focus, profiles=profiles, output=output, notifier=Notifier())
+    output = Output(profiles.keys() | set(MEDIA_KEYS.values()) | set(ZoomControl.KEYS) | set(desktops.KEYS))
+    desktop = desktops.make(output, desktop_name)
+    focus = desktop.focus
+    ctx = SimpleNamespace(desktop=desktop, focus=focus, profiles=profiles, output=output, notifier=Notifier())
     step = config['volume_step']
+    pie_ui.env = desktop.pie_env
     pie_ui.start()
     controls = {
         keys.PIE: PieControl(ctx, pie_ui, step),
@@ -42,7 +45,7 @@ def build(config, focus, pie_ui):
     if ptt is not None and ptt not in e.BTN.keys():
         ptt = None  # a key name such as "key_f18" means: pass F18 through unchanged
     push_to_talk = (lambda value: (output.button(ptt, value), log.debug('push to talk %s', value))) if ptt else None
-    return Router(controls, push_to_talk)
+    return Router(controls, push_to_talk), focus
 
 
 async def forward(dev, router):
@@ -61,14 +64,15 @@ async def main():
     devices = [d for d in devices if keys.is_naga(d.name) and not d.name.startswith(keys.OUR_PREFIX)]
     if not devices:
         sys.exit('Mouse not found')  # systemd restarts us, so this also waits for a Bluetooth reconnect
-    focus = Focus()
+    desktop_name = desktops.detect()
     pie_ui = PieUI()
     try:
-        router = build(config, focus, pie_ui)
+        router, focus = build(config, desktop_name, pie_ui)
     except (KeyError, ValueError) as err:
         sys.exit(f'{CONFIG}: {err}')
     readers = [asyncio.create_task(forward(d, router)) for d in devices]
     log.info('grabbed %s', ', '.join(f'{d.path} ({d.phys})' for d in devices))
+    log.info('desktop: %s', desktop_name)
     asyncio.create_task(focus.run())
 
     def on_sleep(sleeping):

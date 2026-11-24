@@ -1,11 +1,11 @@
-import asyncio, json, logging, os, shutil, subprocess
+import ast, asyncio, json, logging, os, shutil, subprocess
 
 COS_CLI = shutil.which('cos-cli') or os.path.expanduser('~/.cargo/bin/cos-cli')
 
 log = logging.getLogger(__name__)
 
 
-class Focus:
+class CosmicFocus:
     """Follows the focused window's app_id through a long-running `cos-cli serve`."""
 
     def __init__(self):
@@ -45,8 +45,9 @@ class Focus:
         return ''
 
     @staticmethod
-    def set_sticky(on):
+    def set_on_top(on):
         """Make the focused window sticky (on all workspaces, above other windows) or not.
+        COSMIC has no "always on top", so sticky stands in for it.
 
         Returns the window's app_id, or '' if no window is focused.
         """
@@ -70,3 +71,84 @@ class Focus:
                 outputs = app.get('outputs') or [{}]
                 self.output = outputs[0].get('name', '')
                 return
+
+
+GNOME_NAME, GNOME_PATH = 'io.mouseo.Naga', '/io/mouseo/Naga'
+GNOME_MONITOR = ['gdbus', 'monitor', '--session', '--dest', GNOME_NAME, '--object-path', GNOME_PATH]
+
+
+def gnome_call(method, *args):
+    """Call the naga@mouseo GNOME Shell extension. Returns its reply as a tuple, or None."""
+    try:
+        r = subprocess.run(['gdbus', 'call', '--session', '--dest', GNOME_NAME, '--object-path', GNOME_PATH,
+                            '--method', f'{GNOME_NAME}.{method}', *args], capture_output=True, text=True, timeout=2)
+        if r.returncode == 0:
+            return ast.literal_eval(r.stdout.strip())
+        log.debug('GNOME extension %s failed: %s', method, r.stderr.strip())
+    except (OSError, ValueError, SyntaxError, subprocess.TimeoutExpired) as err:
+        log.warning('GNOME extension %s failed: %s', method, err)
+    return None
+
+
+def parse_gnome_signal(line):
+    """(app_id, output) from a `gdbus monitor` FocusChanged line, else None.
+
+    "/io/mouseo/Naga: io.mouseo.Naga.FocusChanged ('firefox', 'DP-1')"
+    """
+    marker = '.FocusChanged '
+    if marker not in line:
+        return None
+    try:
+        app_id, output = ast.literal_eval(line.split(marker, 1)[1].strip())
+        return app_id, output
+    except (ValueError, SyntaxError, TypeError):
+        return None
+
+
+class GnomeFocus:
+    """Follows the focused window through the naga@mouseo GNOME Shell extension (in the dotfiles)."""
+
+    def __init__(self):
+        self.app_id = ''
+        self.output = ''   # connector of the focused window's monitor, e.g. 'DP-1'
+
+    def set(self, app_id, output):
+        self.app_id, self.output = app_id, output
+
+    async def run(self):
+        warned = False
+        while True:
+            try:
+                proc = await asyncio.create_subprocess_exec(*GNOME_MONITOR, stdout=subprocess.PIPE,
+                                                            stderr=subprocess.DEVNULL)
+                async for raw in proc.stdout:
+                    line = raw.decode(errors='replace')
+                    if (focused := parse_gnome_signal(line)) is not None:
+                        self.set(*focused)
+                    elif 'is owned by' in line:   # the extension started (or was already running)
+                        self.set(*(await asyncio.to_thread(gnome_call, 'Focused') or ('', '')))
+                        log.info('focus tracking through the GNOME extension naga@mouseo')
+                    elif 'does not have an owner' in line:
+                        self.set('', '')
+                        if not warned:
+                            log.warning('GNOME extension naga@mouseo is not running: per-app keys use the '
+                                        'default profile, and always on top does nothing. GNOME loads new '
+                                        'extensions at login.')
+                            warned = True
+                log.warning('gdbus monitor exited with code %s', await proc.wait())
+            except OSError as err:
+                log.warning('focus tracking failed: %s', err)
+            self.set('', '')
+            await asyncio.sleep(3)
+
+    @staticmethod
+    def query_output():
+        """The focused window's output, asked fresh."""
+        reply = gnome_call('Focused')
+        return reply[1] if reply else ''
+
+    @staticmethod
+    def set_on_top(on):
+        """Keep the focused window above other windows, or stop. Returns its app_id, or ''."""
+        reply = gnome_call('SetAbove', 'true' if on else 'false')
+        return reply[0] if reply else ''

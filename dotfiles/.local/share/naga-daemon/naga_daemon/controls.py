@@ -92,18 +92,18 @@ class SpeedControl(Control):
 
 
 class ZoomControl(Control):
-    """Hold + wheel: COSMIC screen zoom (Super+= / Super+-).
+    """Hold + wheel: screen zoom (COSMIC: Super+= / Super+-; GNOME: the magnifier).
     Hold + tilt left / right: the app's zoom out / in (Ctrl+- / Ctrl+=). Hold + middle click: reset it (Ctrl+0).
     """
 
     APP_ZOOM = {TILT_LEFT: e.KEY_MINUS, TILT_RIGHT: e.KEY_EQUAL, MIDDLE: e.KEY_0}
-    KEYS = [e.KEY_LEFTMETA, e.KEY_LEFTCTRL, e.KEY_EQUAL, e.KEY_MINUS, e.KEY_0]
+    KEYS = [e.KEY_LEFTCTRL, e.KEY_EQUAL, e.KEY_MINUS, e.KEY_0]
 
     def __init__(self, ctx):
         self.ctx = ctx
 
     def wheel(self, up):
-        self.ctx.output.tap([e.KEY_LEFTMETA, e.KEY_EQUAL if up else e.KEY_MINUS])
+        self.ctx.desktop.zoom(up)
 
     def button(self, code):
         self.ctx.output.tap([e.KEY_LEFTCTRL, self.APP_ZOOM[code]])
@@ -113,8 +113,7 @@ class ZoomControl(Control):
 class WindowControl(Control):
     """Hold + tilt right / left: keep the focused window on top or stop.
 
-    COSMIC has no "always on top", so this uses sticky: the window floats above the others
-    and shows on every workspace.
+    On COSMIC this makes the window sticky (see CosmicFocus.set_on_top).
     """
 
     def __init__(self, ctx):
@@ -127,7 +126,7 @@ class WindowControl(Control):
         return True
 
     def _set(self, on):
-        app = self.ctx.focus.set_sticky(on)
+        app = self.ctx.focus.set_on_top(on)
         if not app:
             self.ctx.notifier.show('Always on top', 'No window is focused')
         else:

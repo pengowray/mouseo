@@ -74,6 +74,7 @@ class PieUI:
     """Talks to the pie_ui.py process, restarting it if it exits. `hover` is the slot under the pointer."""
 
     def __init__(self):
+        self.env = {}             # extra environment for the pie process
         self.proc = None
         self.hover = None
         self.started = 0.0
@@ -86,7 +87,7 @@ class PieUI:
             return False          # it just failed; don't retry on every press
         self.started = time.monotonic()
         package_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        env = dict(os.environ, PYTHONPATH=package_dir)
+        env = dict(os.environ, PYTHONPATH=package_dir, **self.env)
         try:
             self.proc = subprocess.Popen([sys.executable, '-m', 'naga_daemon.pie_ui'], env=env, text=True,
                                          stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -174,7 +175,7 @@ class PieControl(Control):
     def wheel(self, up):
         item = self.target()
         if item is None:
-            audio.change_system_volume(up)
+            self.ctx.desktop.change_system_volume(up)
             self.ui.level(None, audio.system_volume())
             return
         if not item.streams:

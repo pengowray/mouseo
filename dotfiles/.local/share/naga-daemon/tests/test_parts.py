@@ -2,7 +2,8 @@ import unittest
 from naga_daemon.keys import parse_combo
 from naga_daemon.profiles import Profiles
 from naga_daemon.util import bar, app_label, names_match, normalize
-from naga_daemon.focus import Focus
+from naga_daemon.focus import CosmicFocus, parse_gnome_signal
+from naga_daemon.desktop import detect, next_zoom
 from evdev import ecodes as e
 
 
@@ -32,10 +33,28 @@ class PartsTest(unittest.TestCase):
             Profiles({'x': {'fastr': 'dot'}})
 
     def test_focus_update(self):
-        f = Focus()
+        f = CosmicFocus()
         f.update({'params': {'state': {'apps': [{'app_id': 'kitty', 'state': []},
                                                 {'app_id': 'firefox', 'state': ['maximized', 'activated']}]}}})
         self.assertEqual(f.app_id, 'firefox')
+
+    def test_gnome_focus_signal(self):
+        self.assertEqual(parse_gnome_signal("/io/mouseo/Naga: io.mouseo.Naga.FocusChanged ('firefox', 'DP-1')\n"),
+                         ('firefox', 'DP-1'))
+        self.assertEqual(parse_gnome_signal("/io/mouseo/Naga: io.mouseo.Naga.FocusChanged ('', '')\n"), ('', ''))
+        self.assertIsNone(parse_gnome_signal('The name io.mouseo.Naga is owned by :1.40\n'))
+
+    def test_detect_desktop(self):
+        self.assertEqual(detect({'XDG_CURRENT_DESKTOP': 'GNOME'}), 'gnome')
+        self.assertEqual(detect({'XDG_CURRENT_DESKTOP': 'pop:GNOME'}), 'gnome')
+        self.assertEqual(detect({'XDG_CURRENT_DESKTOP': 'COSMIC'}), 'cosmic')
+        self.assertEqual(detect({}), 'cosmic')
+
+    def test_next_zoom(self):
+        self.assertEqual(next_zoom(1.0, True, 1.25, 32), 1.25)
+        self.assertEqual(next_zoom(1.25, False, 1.25, 32), 1.0)
+        self.assertEqual(next_zoom(1.0, False, 1.25, 32), 1.0)
+        self.assertEqual(next_zoom(30.0, True, 1.25, 32), 32)
 
     def test_sleep_signal(self):
         from naga_daemon.sleep import parse

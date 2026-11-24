@@ -1,0 +1,7 @@
+{
+  "uuid": "naga@mouseo",
+  "name": "naga-daemon helper",
+  "description": "Tells naga-daemon (Razer Naga extra buttons) which window is focused and on which monitor, and keeps a window on top when asked.",
+  "shell-version": ["45", "46", "47", "48", "49"],
+  "url": "https://github.com/pengowray/mouseo"
+}

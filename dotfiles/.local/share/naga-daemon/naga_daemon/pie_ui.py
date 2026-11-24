@@ -8,7 +8,8 @@ on stdin and writes the hovered slot to stdout:
   out: {"hover": 0 | null}      null means the centre (system volume)
 
 Slots are the eight directions, clockwise from up: 0 up, 2 right, 4 down, 6 left.
-The overlay covers each monitor so it can see the pointer. The pie appears once the pointer has
+The overlay covers each monitor so it can see the pointer. It is a layer-shell surface on COSMIC,
+and an X11 popup window (GDK_BACKEND=x11, set by the daemon) on GNOME, which has no layer shell. The pie appears once the pointer has
 moved SHOW_PX from where it was first seen, centred on that point. Behind each app's wedge, a faint
 fill grows outward with how loud that app is right now.
 """
@@ -24,6 +25,8 @@ SHOW_PX = 25        # pointer movement that brings up the pie
 DEAD_PX = 45        # within this distance of the centre, the centre (system volume) is hovered
 OUTER = 165         # pie radius
 ICON = 32
+
+LAYER_SHELL = True  # False under X11 (GNOME); set in main()
 
 BG = (0.12, 0.12, 0.13, 0.88)
 WEDGE = (0.20, 0.20, 0.22, 0.92)
@@ -68,11 +71,26 @@ class Pie:
         self.windows = [self.make_window(m) for m in monitors]
 
     def make_window(self, monitor):
-        w = Gtk.Window()
+        w = Gtk.Window(type=Gtk.WindowType.TOPLEVEL if LAYER_SHELL else Gtk.WindowType.POPUP)
         w.set_app_paintable(True)
         visual = w.get_screen().get_rgba_visual()
         if visual:
             w.set_visual(visual)
+        if LAYER_SHELL:
+            self.layer_shell(w, monitor)
+        else:
+            g = monitor.get_geometry()
+            w.move(g.x, g.y)
+            w.resize(g.width, g.height)
+        w.add_events(Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.ENTER_NOTIFY_MASK)
+        w.connect('draw', self.draw)
+        w.connect('motion-notify-event', self.moved)
+        w.connect('enter-notify-event', self.moved)
+        w.connect('delete-event', lambda *_: log(f'the desktop closed the window on {describe(monitor)}'))
+        return w
+
+    @staticmethod
+    def layer_shell(w, monitor):
         GtkLayerShell.init_for_window(w)
         GtkLayerShell.set_layer(w, GtkLayerShell.Layer.OVERLAY)
         GtkLayerShell.set_monitor(w, monitor)
@@ -82,12 +100,6 @@ class Pie:
         for edge in (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.BOTTOM,
                      GtkLayerShell.Edge.LEFT, GtkLayerShell.Edge.RIGHT):
             GtkLayerShell.set_anchor(w, edge, True)
-        w.add_events(Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.ENTER_NOTIFY_MASK)
-        w.connect('draw', self.draw)
-        w.connect('motion-notify-event', self.moved)
-        w.connect('enter-notify-event', self.moved)
-        w.connect('delete-event', lambda *_: log(f'the desktop closed the window on {describe(monitor)}'))
-        return w
 
     # --- commands from the daemon
 
@@ -315,8 +327,10 @@ def read_stdin(pie):
 
 
 def main():
-    if not GtkLayerShell.is_supported():
-        sys.exit('naga pie: the compositor does not support layer shell')
+    global LAYER_SHELL
+    LAYER_SHELL = GtkLayerShell.is_supported()
+    if not LAYER_SHELL and type(Gdk.Display.get_default()).__name__ != 'X11Display':
+        sys.exit('naga pie: the compositor does not support layer shell; on GNOME, run the pie with GDK_BACKEND=x11')
     pie = Pie()
     threading.Thread(target=read_stdin, args=(pie,), daemon=True).start()
     Gtk.main()

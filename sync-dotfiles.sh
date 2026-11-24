@@ -11,6 +11,7 @@ copy .local/bin/naga-daemon
 copy .local/share/naga-daemon
 copy .config/naga/config.toml
 copy .config/systemd/user/naga-daemon.service
+copy .local/share/gnome-shell/extensions/naga@mouseo
 find "$OUT" -name __pycache__ -prune -exec rm -rf {} +
 # The Razer section of the setup script (packages, cos-cli, udev rule)
 sed -n '/^# --- Razer Naga/,/^# --- fonts/p' "$(chezmoi source-path)/.chezmoiscripts/run_onchange_before_install-essentials.sh" \

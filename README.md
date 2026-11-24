@@ -15,6 +15,15 @@ chezmoi dotfiles, not here:
 - `~/.local/share/naga-daemon/naga_daemon/` (the code; `~/.local/bin/naga-daemon` starts it)
 - `~/.config/naga/config.toml` (per-app keys, DPI step, volume step)
 - `~/.config/systemd/user/naga-daemon.service`
+- `~/.local/share/gnome-shell/extensions/naga@mouseo/` (GNOME only: tells the daemon which window is focused)
+
+The daemon works on COSMIC and GNOME, picked from `XDG_CURRENT_DESKTOP` at startup. On GNOME:
+
+- The volume pie is an X11 window (GNOME has no layer shell).
+- Screen zoom uses the GNOME magnifier, and system volume uses the volume keys (GNOME's step and popup).
+- Per-app keys, focused-app volume, the focused window's monitor, and always on top need the
+  `naga@mouseo` extension. GNOME loads a newly added extension at the next login.
+- Push to talk only reaches Discord while its window is focused.
 
 Its tests: `cd ~/.local/share/naga-daemon && python3 -m unittest discover -s tests -t .`
 

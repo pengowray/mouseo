@@ -2,7 +2,7 @@
 #   systemctl --user restart naga-daemon
 #
 # The mouse sends these keys (set in ~/projects/mouseo/layout.py), and the daemon gives them their behaviour:
-#   Thumb 1  (F24)  hold + wheel: screen zoom (Super+= / Super+-).
+#   Thumb 1  (F24)  hold + wheel: screen zoom (COSMIC: Super+= / Super+-; GNOME: the magnifier).
 #                   Hold + tilt left / right: zoom the app out / in (Ctrl+- / Ctrl+=).
 #                   Hold + middle click: reset the app's zoom (Ctrl+0).
 #   Thumb 2  (F19)  tap: middle click.   Hold + wheel: change DPI.
@@ -16,7 +16,8 @@
 #                   tilts go to the app under the pointer.
 #   Thumb 8  (F13)  hold + wheel: volume of the focused app.
 #   Thumb 9  (F14)  hold + wheel: Spotify volume.
-#   Thumb 7  (F17)  hold + tilt right / left: keep the focused window on top (COSMIC "sticky") / stop.
+#   Thumb 7  (F17)  hold + tilt right / left: keep the focused window on top / stop.
+#                   On COSMIC this makes the window sticky. On GNOME it needs the naga@mouseo extension.
 #   Thumb 12 (F15)  hold + wheel: playback speed.
 #   Thumb 11 (F16)  hold + wheel: fine playback speed.
 # While holding thumb 5, 8 or 9:   middle click = play/pause, tilt left/right = previous/next track,
@@ -36,10 +37,12 @@ brightness_step = 5          # percent per wheel step (thumb 4)
 # button instead. Browsers ignore it. Use "key_f18" to pass F18 through unchanged.
 # For push to talk while Discord is in the background, turn on COSMIC Settings > Applications >
 # X11 applications compatibility > "Mouse button events in X11 applications".
+# GNOME has no such setting, so push to talk only reaches Discord while it is focused.
 push_to_talk = "btn_task"    # mouse button 12; "btn_forward" and "btn_back" are 10 and 11
 
 # Which keys to send while holding thumb 11 or 12, by focused app.
-# "apps" matches part of the window's app_id, ignoring case.
+# "apps" matches part of the window's app_id, ignoring case. On GNOME the app_id comes from the
+# naga@mouseo extension; without it, every app uses the default profile.
 # The first profile that matches is used, and "default" is used when none match.
 
 [profiles.browser]
