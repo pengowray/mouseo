@@ -48,7 +48,7 @@ class AppControl(Control):
     def wheel(self, up):
         app = self.target()
         if not app:
-            self.ctx.notifier.show(*self.missing)
+            self.ctx.notifier.show(self.missing[0], self.ctx.focus.missing or self.missing[1])
             return
         title = f'{app_label(app)} volume'
         if self.streams is None:
@@ -128,7 +128,7 @@ class WindowControl(Control):
     def _set(self, on):
         app = self.ctx.focus.set_on_top(on)
         if not app:
-            self.ctx.notifier.show('Always on top', 'No window is focused')
+            self.ctx.notifier.show('Always on top', self.ctx.focus.missing or 'No window is focused')
         else:
             self.ctx.notifier.show('Always on top', f'{"On" if on else "Off"}: {app_label(app)}')
 

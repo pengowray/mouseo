@@ -23,7 +23,7 @@ The daemon works on COSMIC and GNOME, picked from `XDG_CURRENT_DESKTOP` at start
 - Screen zoom uses the GNOME magnifier, and system volume uses the volume keys (GNOME's step and popup).
 - Per-app keys, focused-app volume, the focused window's monitor, and always on top need the
   `naga@mouseo` extension. GNOME loads a newly added extension at the next login.
-- Push to talk only reaches Discord while its window is focused.
+- Push to talk may only reach Discord while its window is focused (not tested yet).
 
 Its tests: `cd ~/.local/share/naga-daemon && python3 -m unittest discover -s tests -t .`
 

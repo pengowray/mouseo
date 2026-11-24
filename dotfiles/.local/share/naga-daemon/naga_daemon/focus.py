@@ -8,6 +8,8 @@ log = logging.getLogger(__name__)
 class CosmicFocus:
     """Follows the focused window's app_id through a long-running `cos-cli serve`."""
 
+    missing = ''   # why the focused window is unknown, for notifications; '' if nothing is wrong
+
     def __init__(self):
         self.app_id = ''
         self.output = ''   # COSMIC output name of the focused window, e.g. 'DP-1'
@@ -108,9 +110,12 @@ def parse_gnome_signal(line):
 class GnomeFocus:
     """Follows the focused window through the naga@mouseo GNOME Shell extension (in the dotfiles)."""
 
+    NOT_RUNNING = "Can't tell which window is focused: the naga@mouseo GNOME extension isn't running"
+
     def __init__(self):
         self.app_id = ''
         self.output = ''   # connector of the focused window's monitor, e.g. 'DP-1'
+        self.missing = ''  # as CosmicFocus.missing
 
     def set(self, app_id, output):
         self.app_id, self.output = app_id, output
@@ -126,10 +131,12 @@ class GnomeFocus:
                     if (focused := parse_gnome_signal(line)) is not None:
                         self.set(*focused)
                     elif 'is owned by' in line:   # the extension started (or was already running)
+                        self.missing = ''
                         self.set(*(await asyncio.to_thread(gnome_call, 'Focused') or ('', '')))
                         log.info('focus tracking through the GNOME extension naga@mouseo')
                     elif 'does not have an owner' in line:
                         self.set('', '')
+                        self.missing = self.NOT_RUNNING
                         if not warned:
                             log.warning('GNOME extension naga@mouseo is not running: per-app keys use the '
                                         'default profile, and always on top does nothing. GNOME loads new '

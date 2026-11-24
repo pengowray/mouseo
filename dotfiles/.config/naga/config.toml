@@ -37,7 +37,8 @@ brightness_step = 5          # percent per wheel step (thumb 4)
 # button instead. Browsers ignore it. Use "key_f18" to pass F18 through unchanged.
 # For push to talk while Discord is in the background, turn on COSMIC Settings > Applications >
 # X11 applications compatibility > "Mouse button events in X11 applications".
-# GNOME has no such setting, so push to talk only reaches Discord while it is focused.
+# GNOME has no such setting, so push to talk may only reach Discord while its window is focused
+# (not tested yet).
 push_to_talk = "btn_task"    # mouse button 12; "btn_forward" and "btn_back" are 10 and 11
 
 # Which keys to send while holding thumb 11 or 12, by focused app.
