@@ -23,8 +23,8 @@ process, above every window including full-screen games. On GNOME:
 
 - The overlay is an X11 window (GNOME has no layer shell).
 - Screen zoom uses the GNOME magnifier, and the extension limits it to the monitor under the
-  pointer. On GNOME Wayland with two monitors of different sizes, the magnifier flickers and
-  shows old images, also with GNOME's own zoom shortcut.
+  pointer. Without the extension, on GNOME Wayland with two monitors of different sizes, the
+  magnifier flickers and shows old images.
 - System volume uses the volume keys (GNOME's step and volume popup).
 - Per-app keys, focused-app volume, the focused window's monitor, and always on top need the
   `naga@mouseo` extension. GNOME loads a newly added extension at the next login; on X11,
