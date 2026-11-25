@@ -9,7 +9,7 @@ from evdev import ecodes as e
 from . import audio, players
 from .monitors import BRIGHTNESS, COLOUR_PRESET, GAINS
 from .keys import MIDDLE, TILT_LEFT, TILT_RIGHT
-from .util import bar, app_label
+from .util import app_label
 
 log = logging.getLogger(__name__)
 
@@ -48,17 +48,17 @@ class AppControl(Control):
     def wheel(self, up):
         app = self.target()
         if not app:
-            self.ctx.notifier.show(self.missing[0], self.ctx.focus.missing or self.missing[1])
+            self.ctx.popup.show(self.missing[0], self.ctx.focus.missing or self.missing[1])
             return
         title = f'{app_label(app)} volume'
         if self.streams is None:
             self.streams = [s.index for s in audio.streams_for(app)]
         if not self.streams:
-            self.ctx.notifier.show(title, 'This app is not playing any sound')
+            self.ctx.popup.show(title, 'This app is not playing any sound')
             return
         audio.change_volume(self.streams, self.step if up else -self.step)
         if (level := audio.volume_of(self.streams)) is not None:
-            self.ctx.notifier.show(title, f'{bar(level, 0, 100)}  {level}%')
+            self.ctx.popup.show(title, f'{level}%', level / 100)
 
     def button(self, code):
         player = players.find_player(self.target()) if self.target() else None
@@ -128,9 +128,9 @@ class WindowControl(Control):
     def _set(self, on):
         app = self.ctx.focus.set_on_top(on)
         if not app:
-            self.ctx.notifier.show('Always on top', self.ctx.focus.missing or 'No window is focused')
+            self.ctx.popup.show('Always on top', self.ctx.focus.missing or 'No window is focused')
         else:
-            self.ctx.notifier.show('Always on top', f'{"On" if on else "Off"}: {app_label(app)}')
+            self.ctx.popup.show('Always on top', f'{"On" if on else "Off"}: {app_label(app)}')
 
 
 class DpiControl(Control):
@@ -150,12 +150,12 @@ class DpiControl(Control):
         current = self.shown or self.worker.current
         if current is None:
             reason = self.worker.error or 'still connecting to OpenRazer'
-            self.ctx.notifier.show('DPI', f'Cannot change DPI: {reason}')
+            self.ctx.popup.show('DPI', f'Cannot change DPI: {reason}')
             self.worker.request(refresh=True)
             return
         new = min(self.hi, max(self.lo, (current // self.step + (1 if up else -1)) * self.step))
         self.shown = new
-        self.ctx.notifier.show('DPI', f'{bar(new, self.lo, self.hi)}  {new}')
+        self.ctx.popup.show('DPI', str(new), (new - self.lo) / (self.hi - self.lo))
         if new != current:
             self.worker.request(new)
         log.debug('dpi %s -> %s', current, new)
@@ -185,9 +185,9 @@ class MonitorControl(Control):
         threading.Thread(target=self._locate, daemon=True).start()
 
     def _locate(self):
-        output = self.ctx.focus.query_output() or self.ctx.focus.output
-        self.monitor = self.worker.find(output)
-        log.debug('monitor for output %r: %s', output, self.monitor and self.monitor.model)
+        output, serial = self.ctx.focus.query_monitor()
+        self.monitor = self.worker.find(output, serial)
+        log.debug('monitor for output %r, serial %r: %s', output, serial, self.monitor and self.monitor.model)
         if self.monitor:
             self.worker.refresh(self.monitor)
         self.located.set()
@@ -195,7 +195,7 @@ class MonitorControl(Control):
     def ready(self):
         self.located.wait(0.5)  # usually done before the first wheel step
         if self.monitor is None:
-            self.ctx.notifier.show('Monitor', 'Still looking for monitors')
+            self.ctx.popup.show('Monitor', 'Still looking for monitors')
         return self.monitor
 
     def wheel(self, up):
@@ -203,10 +203,10 @@ class MonitorControl(Control):
             return
         current = m.values.get(BRIGHTNESS)
         if current is None:
-            self.ctx.notifier.show(f'{m.model} brightness', 'Reading the monitor, try again')
+            self.ctx.popup.show(f'{m.model} brightness', 'Reading the monitor, try again')
             return
         new = min(100, max(0, current + (self.step if up else -self.step)))
-        self.ctx.notifier.show(f'{m.model} brightness', f'{bar(new, 0, 100)}  {new}%')
+        self.ctx.popup.show(f'{m.model} brightness', f'{new}%', new / 100)
         if new != current:
             self.worker.set(m, BRIGHTNESS, new)
 
@@ -220,7 +220,7 @@ class MonitorControl(Control):
         except (OSError, ValueError):
             mode = None
         new = 'day' if mode == 'night' else 'night'
-        self.ctx.notifier.show('Monitors', 'Night: Warm 3' if new == 'night' else 'Day: 5000 K (LG 6500 K)')
+        self.ctx.popup.show('Monitors', 'Night: Warm 3' if new == 'night' else 'Day: 5000 K (LG 6500 K)')
         subprocess.Popen([self.NIGHT_LIGHT, new], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         log.debug('monitor-night-light %s', new)
         if self.monitor:
@@ -237,12 +237,12 @@ class MonitorControl(Control):
         presets = self.presets.get(m.serial)
         title = f'{m.model} colour'
         if not presets:
-            self.ctx.notifier.show(title, 'No colour presets for this monitor in config.toml')
+            self.ctx.popup.show(title, 'No colour presets for this monitor in config.toml')
             return True
         i = self.current_index(m, presets)
         i = max(0, i - 1) if code == TILT_LEFT else min(len(presets) - 1, i + 1)
         value, name, gains = presets[i]
-        self.ctx.notifier.show(title, f'{bar(i, 0, len(presets) - 1)}  {name}')
+        self.ctx.popup.show(title, name, i / max(1, len(presets) - 1))
         if value != m.values.get(COLOUR_PRESET) or gains:
             self.worker.set(m, COLOUR_PRESET, value)
         for feature, gain in zip(GAINS, gains or ()):

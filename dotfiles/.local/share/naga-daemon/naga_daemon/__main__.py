@@ -7,9 +7,9 @@ from .controls import AppControl, SpeedControl, ZoomControl, DpiControl, Monitor
 from . import desktop as desktops
 from .dpi import DpiWorker
 from .monitors import MonitorWorker
-from .notify import Notifier
 from .output import Output
-from .pie import PieControl, PieUI
+from .overlay import Overlay
+from .pie import PieControl
 from .profiles import Profiles
 from .router import Router
 from .sleep import SleepWatch
@@ -18,17 +18,17 @@ log = logging.getLogger('naga_daemon')
 CONFIG = os.environ.get('NAGA_CONFIG') or os.path.expanduser('~/.config/naga/config.toml')
 
 
-def build(config, desktop_name, pie_ui):
+def build(config, desktop_name, overlay):
     profiles = Profiles(config['profiles'])
     output = Output(profiles.keys() | set(MEDIA_KEYS.values()) | set(ZoomControl.KEYS) | set(desktops.KEYS))
     desktop = desktops.make(output, desktop_name)
     focus = desktop.focus
-    ctx = SimpleNamespace(desktop=desktop, focus=focus, profiles=profiles, output=output, notifier=Notifier())
+    ctx = SimpleNamespace(desktop=desktop, focus=focus, profiles=profiles, output=output, popup=overlay)
     step = config['volume_step']
-    pie_ui.env = desktop.pie_env
-    pie_ui.start()
+    overlay.env = desktop.overlay_env
+    overlay.start()
     controls = {
-        keys.PIE: PieControl(ctx, pie_ui, step),
+        keys.PIE: PieControl(ctx, overlay, step),
         keys.WINDOW: WindowControl(ctx),
         keys.FOCUSED_APP: AppControl(ctx, lambda: focus.app_id, step, ('App volume', 'No window is focused')),
         keys.SPOTIFY: AppControl(ctx, lambda: 'spotify', step),
@@ -65,9 +65,9 @@ async def main():
     if not devices:
         sys.exit('Mouse not found')  # systemd restarts us, so this also waits for a Bluetooth reconnect
     desktop_name = desktops.detect()
-    pie_ui = PieUI()
+    overlay = Overlay()
     try:
-        router, focus = build(config, desktop_name, pie_ui)
+        router, focus = build(config, desktop_name, overlay)
     except (KeyError, ValueError) as err:
         sys.exit(f'{CONFIG}: {err}')
     readers = [asyncio.create_task(forward(d, router)) for d in devices]
@@ -76,8 +76,8 @@ async def main():
     asyncio.create_task(focus.run())
 
     def on_sleep(sleeping):
-        if pie_ui.stop():
-            log.info('%s: stopped the volume pie; thumb 5 starts a new one', 'going to sleep' if sleeping else 'woke up')
+        if overlay.stop():
+            log.info('%s: stopped the overlay; the next popup or press of thumb 5 starts a new one', 'going to sleep' if sleeping else 'woke up')
     asyncio.create_task(SleepWatch(on_sleep).run())
     done, _ = await asyncio.wait(readers, return_when=asyncio.FIRST_COMPLETED)
     for task in done:

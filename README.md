@@ -17,13 +17,22 @@ chezmoi dotfiles, not here:
 - `~/.config/systemd/user/naga-daemon.service`
 - `~/.local/share/gnome-shell/extensions/naga@mouseo/` (GNOME only: tells the daemon which window is focused)
 
-The daemon works on COSMIC and GNOME, picked from `XDG_CURRENT_DESKTOP` at startup. On GNOME:
+The daemon works on COSMIC and GNOME (X11 or Wayland), picked from `XDG_CURRENT_DESKTOP` at
+startup. Its popups (DPI, brightness, app volume) and the volume pie are drawn by one overlay
+process, above every window including full-screen games. On GNOME:
 
-- The volume pie is an X11 window (GNOME has no layer shell).
-- Screen zoom uses the GNOME magnifier, and system volume uses the volume keys (GNOME's step and popup).
+- The overlay is an X11 window (GNOME has no layer shell).
+- Screen zoom uses the GNOME magnifier. On GNOME Wayland with two monitors of different sizes,
+  the magnifier flickers and shows old images, also with GNOME's own zoom shortcut.
+- System volume uses the volume keys (GNOME's step and volume popup).
 - Per-app keys, focused-app volume, the focused window's monitor, and always on top need the
-  `naga@mouseo` extension. GNOME loads a newly added extension at the next login.
-- Push to talk may only reach Discord while its window is focused (not tested yet).
+  `naga@mouseo` extension. GNOME loads a newly added extension at the next login; on X11,
+  Alt+F2 then `r` reloads it.
+- On GNOME Wayland, push to talk may only reach Discord while its window is focused (not tested).
+
+If the tilts stop doing anything with every thumb button, turn the mouse off and on. The mouse
+can get stuck sending Left Ctrl and F18 (the tilt keys) as held down, and then sends no new
+tilt presses.
 
 Its tests: `cd ~/.local/share/naga-daemon && python3 -m unittest discover -s tests -t .`
 

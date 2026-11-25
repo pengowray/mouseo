@@ -1,7 +1,7 @@
 import unittest
 from naga_daemon.keys import parse_combo
 from naga_daemon.profiles import Profiles
-from naga_daemon.util import bar, app_label, names_match, normalize
+from naga_daemon.util import app_label, names_match, normalize
 from naga_daemon.focus import CosmicFocus, parse_gnome_signal
 from naga_daemon.desktop import detect, next_zoom
 from evdev import ecodes as e
@@ -13,11 +13,6 @@ class PartsTest(unittest.TestCase):
         self.assertEqual(parse_combo('alt+left'), [e.KEY_LEFTALT, e.KEY_LEFT])
         with self.assertRaises(ValueError):
             parse_combo('shift+nosuchkey')
-
-    def test_bar(self):
-        self.assertEqual(bar(200, 200, 2400), '⬜' * 12)
-        self.assertEqual(bar(2400, 200, 2400), '🟩' * 12)
-        self.assertEqual(bar(250, 200, 2400).count('🟩'), 1)  # anything above the minimum shows one square
 
     def test_names(self):
         self.assertEqual(app_label('VLC media player (LibVLC 3.0.23)'), 'VLC media player')
@@ -39,9 +34,9 @@ class PartsTest(unittest.TestCase):
         self.assertEqual(f.app_id, 'firefox')
 
     def test_gnome_focus_signal(self):
-        self.assertEqual(parse_gnome_signal("/io/mouseo/Naga: io.mouseo.Naga.FocusChanged ('firefox', 'DP-1')\n"),
-                         ('firefox', 'DP-1'))
-        self.assertEqual(parse_gnome_signal("/io/mouseo/Naga: io.mouseo.Naga.FocusChanged ('', '')\n"), ('', ''))
+        self.assertEqual(parse_gnome_signal("/io/mouseo/Naga: io.mouseo.Naga.FocusChanged ('firefox', 'DP-0', 'UHB17')\n"),
+                         ('firefox', 'DP-0', 'UHB17'))
+        self.assertEqual(parse_gnome_signal("/io/mouseo/Naga: io.mouseo.Naga.FocusChanged ('', '', '')\n"), ('', '', ''))
         self.assertIsNone(parse_gnome_signal('The name io.mouseo.Naga is owned by :1.40\n'))
 
     def test_detect_desktop(self):
@@ -49,6 +44,18 @@ class PartsTest(unittest.TestCase):
         self.assertEqual(detect({'XDG_CURRENT_DESKTOP': 'pop:GNOME'}), 'gnome')
         self.assertEqual(detect({'XDG_CURRENT_DESKTOP': 'COSMIC'}), 'cosmic')
         self.assertEqual(detect({}), 'cosmic')
+
+    def test_find_monitor(self):
+        from types import SimpleNamespace
+        from naga_daemon.monitors import MonitorWorker
+        w = MonitorWorker.__new__(MonitorWorker)   # no thread, no ddcutil
+        w.ready = SimpleNamespace(is_set=lambda: True)
+        lg = SimpleNamespace(connector='DP-1', serial='304NT')
+        phl = SimpleNamespace(connector='DP-2', serial='UHB17')
+        w.monitors = [lg, phl]
+        self.assertIs(w.find('DP-0', 'UHB17'), phl)   # X11 name that ddcutil doesn't use: the serial decides
+        self.assertIs(w.find('DP-2'), phl)
+        self.assertIs(w.find('', ''), lg)
 
     def test_next_zoom(self):
         self.assertEqual(next_zoom(1.0, True, 1.25, 32), 1.25)

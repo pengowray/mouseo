@@ -1,17 +1,21 @@
-"""The volume pie: a transparent overlay drawn around the pointer while thumb 5 is held.
+"""The daemon's on-screen overlays: the volume pie, and the popup that shows a setting as it
+changes (DPI, brightness, app volume). Both sit above every window, full-screen games included.
 
-Runs as its own process (GTK wants the main thread), started by pie.PieUI. Reads JSON lines
+Runs as its own process (GTK wants the main thread), started by overlay.Overlay. Reads JSON lines
 on stdin and writes the hovered slot to stdout:
   in:  {"op": "open", "slots": {"0": {"label", "icons", "level", "note", "streams"}, ...}, "centre": {...}}
        {"op": "level", "slot": 0 | null, "level": 40}
        {"op": "close"}
+       {"op": "popup", "title": "DPI", "text": "800", "level": 0.25 | null}
   out: {"hover": 0 | null}      null means the centre (system volume)
 
-Slots are the eight directions, clockwise from up: 0 up, 2 right, 4 down, 6 left.
-The overlay covers each monitor so it can see the pointer. It is a layer-shell surface on COSMIC,
-and an X11 popup window (GDK_BACKEND=x11, set by the daemon) on GNOME, which has no layer shell. The pie appears once the pointer has
+Pie slots are the eight directions, clockwise from up: 0 up, 2 right, 4 down, 6 left.
+The pie covers each monitor so it can see the pointer. It appears once the pointer has
 moved SHOW_PX from where it was first seen, centred on that point. Behind each app's wedge, a faint
 fill grows outward with how loud that app is right now.
+
+The windows are layer-shell surfaces on COSMIC, and X11 popup windows (GDK_BACKEND=x11, set by the
+daemon) on GNOME, which has no layer shell. The popup ignores the mouse, so clicks go to the window below.
 """
 import json, math, sys, threading
 import gi
@@ -37,6 +41,10 @@ BAR = (0.40, 0.80, 0.45, 1)
 METER = (1, 1, 1, 0.13)
 METER_FALL = 0.06    # how far a meter drops per frame
 FRAME_MS = 33
+
+POPUP_W, POPUP_H = 300, 86
+POPUP_BOTTOM = 120  # gap below the popup, in pixels
+POPUP_MS = 1500     # how long the popup stays after the last change
 
 
 def slot_at(dx, dy):
@@ -241,9 +249,9 @@ class Pie:
             cr.fill()
 
     @staticmethod
-    def text(cr, x, y, s, size, colour, bold=False):
-        if len(s) > 14:
-            s = s[:13] + '…'
+    def text(cr, x, y, s, size, colour, bold=False, limit=14):
+        if len(s) > limit:
+            s = s[:limit - 1] + '…'
         cr.select_font_face('Sans', cairo.FONT_SLANT_NORMAL,
                             cairo.FONT_WEIGHT_BOLD if bold else cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(size)
@@ -285,13 +293,99 @@ class Pie:
         return None
 
 
+
+class Popup:
+    """A box near the bottom of the screen showing a title, a value and an optional bar."""
+
+    def __init__(self):
+        self.title, self.text, self.level = '', '', None
+        self.hide_timer = None
+        self.window = None
+
+    def make_window(self):
+        w = Gtk.Window(type=Gtk.WindowType.TOPLEVEL if LAYER_SHELL else Gtk.WindowType.POPUP)
+        w.set_app_paintable(True)
+        if visual := w.get_screen().get_rgba_visual():
+            w.set_visual(visual)
+        w.set_default_size(POPUP_W, POPUP_H)
+        w.resize(POPUP_W, POPUP_H)
+        if LAYER_SHELL:
+            GtkLayerShell.init_for_window(w)
+            GtkLayerShell.set_layer(w, GtkLayerShell.Layer.OVERLAY)
+            GtkLayerShell.set_namespace(w, 'naga-popup')
+            GtkLayerShell.set_keyboard_mode(w, GtkLayerShell.KeyboardMode.NONE)
+            GtkLayerShell.set_anchor(w, GtkLayerShell.Edge.BOTTOM, True)
+            GtkLayerShell.set_margin(w, GtkLayerShell.Edge.BOTTOM, POPUP_BOTTOM)
+        w.connect('draw', self.draw)
+        w.connect('realize', lambda w: w.input_shape_combine_region(cairo.Region()))  # clicks pass through
+        return w
+
+    def command(self, msg):
+        self.show(msg.get('title', ''), msg.get('text', ''), msg.get('level'))
+        return False
+
+    def show(self, title, text, level):
+        self.title, self.text, self.level = title, text, level
+        if self.window is None:
+            self.window = self.make_window()
+        if not LAYER_SHELL:   # the compositor places a layer surface; under X11, use the pointer's monitor
+            display = Gdk.Display.get_default()
+            _, x, y = display.get_default_seat().get_pointer().get_position()
+            g = display.get_monitor_at_point(x, y).get_geometry()
+            self.window.move(g.x + (g.width - POPUP_W) // 2, g.y + g.height - POPUP_H - POPUP_BOTTOM)
+        self.window.show_all()
+        self.window.queue_draw()
+        if self.hide_timer is not None:
+            GLib.source_remove(self.hide_timer)
+        self.hide_timer = GLib.timeout_add(POPUP_MS, self.hide)
+
+    def hide(self):
+        self.hide_timer = None
+        if self.window is not None:
+            self.window.hide()
+        return False
+
+    def draw(self, w, cr):
+        cr.set_operator(cairo.OPERATOR_SOURCE)
+        cr.set_source_rgba(0, 0, 0, 0)
+        cr.paint()
+        cr.set_operator(cairo.OPERATOR_OVER)
+        rounded_rect(cr, 0, 0, POPUP_W, POPUP_H, 14)
+        cr.set_source_rgba(*BG)
+        cr.fill()
+        cx = POPUP_W / 2
+        has_bar = self.level is not None
+        top = 22 if has_bar else 30
+        Pie.text(cr, cx, top, self.title, 14, TEXT, bold=True, limit=36)
+        Pie.text(cr, cx, top + 24, self.text, 13, DIM, limit=40)
+        if has_bar:
+            width, y = POPUP_W - 60, POPUP_H - 18
+            rounded_rect(cr, 30, y, width, 6, 3)
+            cr.set_source_rgba(1, 1, 1, 0.2)
+            cr.fill()
+            filled = width * min(1.0, max(0.0, self.level))
+            if filled > 0:
+                rounded_rect(cr, 30, y, max(filled, 6), 6, 3)
+                cr.set_source_rgba(*BAR)
+                cr.fill()
+
+
+def rounded_rect(cr, x, y, w, h, r):
+    cr.new_sub_path()
+    cr.arc(x + w - r, y + r, r, -math.pi / 2, 0)
+    cr.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
+    cr.arc(x + r, y + h - r, r, math.pi / 2, math.pi)
+    cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
+    cr.close_path()
+
+
 def normalize(name):
     return ''.join(ch for ch in name.lower() if ch.isalnum())
 
 
 def log(text):
     """To the daemon's journal. stdout is for the daemon."""
-    print(f'volume pie: {text}', file=sys.stderr, flush=True)
+    print(f'overlay: {text}', file=sys.stderr, flush=True)
 
 
 def describe(monitor):
@@ -315,13 +409,16 @@ def app_by_name():
     return _apps
 
 
-def read_stdin(pie):
+def read_stdin(pie, popup):
     for line in sys.stdin:
         try:
             msg = json.loads(line)
         except ValueError:
             continue
-        GLib.idle_add(pie.command, msg)
+        if msg.get('op') == 'popup':
+            GLib.idle_add(popup.command, msg)
+        else:
+            GLib.idle_add(pie.command, msg)
     GLib.idle_add(pie.stop_meters)
     GLib.idle_add(Gtk.main_quit)   # the daemon went away
 
@@ -330,9 +427,9 @@ def main():
     global LAYER_SHELL
     LAYER_SHELL = GtkLayerShell.is_supported()
     if not LAYER_SHELL and type(Gdk.Display.get_default()).__name__ != 'X11Display':
-        sys.exit('naga pie: the compositor does not support layer shell; on GNOME, run the pie with GDK_BACKEND=x11')
+        sys.exit('naga overlay: the compositor does not support layer shell; on GNOME, run the pie with GDK_BACKEND=x11')
     pie = Pie()
-    threading.Thread(target=read_stdin, args=(pie,), daemon=True).start()
+    threading.Thread(target=read_stdin, args=(pie, Popup()), daemon=True).start()
     Gtk.main()
 
 

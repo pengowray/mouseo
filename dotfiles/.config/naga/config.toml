@@ -28,7 +28,7 @@
 # Leave a key out of a profile to do nothing in that app.
 
 dpi_step = 50                # DPI change per wheel step (thumb 2)
-dpi_min = 200                # the notification bar is empty at dpi_min and full at dpi_max
+dpi_min = 200                # the popup's bar is empty at dpi_min and full at dpi_max
 dpi_max = 2400
 volume_step = 2              # percent per wheel step (thumbs 5, 8 and 9; thumb 5's system volume uses the desktop's step)
 brightness_step = 5          # percent per wheel step (thumb 4)

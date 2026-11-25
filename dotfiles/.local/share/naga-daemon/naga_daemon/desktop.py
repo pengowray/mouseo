@@ -1,5 +1,5 @@
 """What differs between COSMIC and GNOME: focus tracking, the system volume, screen zoom, and
-how the volume pie gets a window above the others. Picked once at startup."""
+how the overlay (volume pie and popup) gets windows above the others. Picked once at startup."""
 import logging, os, subprocess
 from evdev import ecodes as e
 from .focus import CosmicFocus, GnomeFocus
@@ -18,7 +18,7 @@ def detect(env=os.environ):
 
 class Cosmic:
     name = 'cosmic'
-    pie_env = {}     # the pie uses layer shell
+    overlay_env = {}   # the overlay uses layer shell
 
     def __init__(self, output):
         self.output = output
@@ -37,7 +37,7 @@ class Cosmic:
 
 class Gnome:
     name = 'gnome'
-    pie_env = {'GDK_BACKEND': 'x11'}   # Mutter has no layer shell; an X11 popup window sits above everything
+    overlay_env = {'GDK_BACKEND': 'x11'}   # Mutter has no layer shell; X11 popup windows sit above everything
     ZOOM_STEP = 1.25                   # magnifier factor per wheel step
     ZOOM_MAX = 32.0
 

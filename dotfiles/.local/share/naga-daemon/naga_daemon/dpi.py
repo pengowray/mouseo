@@ -5,7 +5,7 @@ log = logging.getLogger(__name__)
 
 
 class DpiWorker(threading.Thread):
-    """Talks to OpenRazer off the input thread, so DPI notifications show without waiting.
+    """Talks to OpenRazer off the input thread, so the DPI popup shows without waiting.
 
     Only the latest requested DPI is sent; steps that pile up while a write is in progress are skipped.
     """

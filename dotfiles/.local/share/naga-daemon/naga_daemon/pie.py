@@ -4,9 +4,9 @@ then go to the app under the pointer.
 
 Up is always the focused app, down is the background app most likely to be the one you hear,
 and the other directions hold the remaining apps with audio. The pie itself is drawn by
-pie_ui.py in a separate process.
+overlay_ui.py in a separate process.
 """
-import json, logging, os, subprocess, sys, threading, time
+import logging, threading
 from dataclasses import dataclass, field
 from evdev import ecodes as e
 from . import audio, players
@@ -68,79 +68,6 @@ def assign_slots(focused_app, streams, playing):
     for slot, group in zip((DOWN, *OTHER_SLOTS), ranked):
         slots[slot] = _item(group[0].app, app_label(group[0].app), group)
     return slots
-
-
-class PieUI:
-    """Talks to the pie_ui.py process, restarting it if it exits. `hover` is the slot under the pointer."""
-
-    def __init__(self):
-        self.env = {}             # extra environment for the pie process
-        self.proc = None
-        self.hover = None
-        self.started = 0.0
-        self.lock = threading.Lock()
-
-    def _ensure(self):
-        if self.proc and self.proc.poll() is None:
-            return True
-        if time.monotonic() - self.started < 5:
-            return False          # it just failed; don't retry on every press
-        self.started = time.monotonic()
-        package_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        env = dict(os.environ, PYTHONPATH=package_dir, **self.env)
-        try:
-            self.proc = subprocess.Popen([sys.executable, '-m', 'naga_daemon.pie_ui'], env=env, text=True,
-                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        except OSError as err:
-            log.warning('cannot start the volume pie: %s', err)
-            return False
-        threading.Thread(target=self._read, args=(self.proc,), daemon=True).start()
-        log.info('volume pie started (pid %s)', self.proc.pid)
-        return True
-
-    def _read(self, proc):
-        for line in proc.stdout:
-            try:
-                self.hover = json.loads(line).get('hover')
-            except ValueError:
-                pass
-        code = proc.wait()
-        if proc is self.proc:     # not stopped on purpose by stop()
-            log.warning('volume pie exited with code %s', code)
-
-    def send(self, msg):
-        with self.lock:
-            if not self._ensure():
-                return
-            try:
-                self.proc.stdin.write(json.dumps(msg) + '\n')
-                self.proc.stdin.flush()
-            except OSError as err:
-                log.warning('volume pie: %s', err)
-
-    def start(self):
-        with self.lock:
-            self._ensure()
-
-    def stop(self):
-        """End the pie process. The next send() starts a new one. Returns True if one was running."""
-        with self.lock:
-            proc, self.proc = self.proc, None
-            self.started, self.hover = 0.0, None
-        if proc and proc.poll() is None:
-            proc.terminate()
-            return True
-        return False
-
-    def open(self, slots, centre):
-        self.send({'op': 'open', 'slots': {str(k): v.as_json() for k, v in slots.items()}, 'centre': centre})
-
-    def level(self, slot, level):
-        self.send({'op': 'level', 'slot': slot, 'level': level})
-
-    def close(self):
-        self.hover = None
-        self.send({'op': 'close'})
 
 
 class PieControl(Control):

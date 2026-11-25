@@ -9,11 +9,15 @@ const NAME = 'io.mouseo.Naga';
 const PATH = '/io/mouseo/Naga';
 const IFACE = `<node>
   <interface name="${NAME}">
-    <!-- The focused window's app id and the connector of its monitor, e.g. ('firefox', 'DP-1') -->
-    <method name="Focused"><arg type="s" direction="out"/><arg type="s" direction="out"/></method>
+    <!-- The focused window's app id, and the connector and serial number of its monitor,
+         e.g. ('firefox', 'DP-1', '304NTJJ4A468'). Connector names differ between X11 and Wayland;
+         the serial number matches what ddcutil reports. -->
+    <method name="Focused">
+      <arg type="s" direction="out"/><arg type="s" direction="out"/><arg type="s" direction="out"/>
+    </method>
     <!-- Keep the focused window above others, or stop. Returns its app id, or '' if none is focused. -->
     <method name="SetAbove"><arg type="b" direction="in"/><arg type="s" direction="out"/></method>
-    <signal name="FocusChanged"><arg type="s"/><arg type="s"/></signal>
+    <signal name="FocusChanged"><arg type="s"/><arg type="s"/><arg type="s"/></signal>
   </interface>
 </node>`;
 
@@ -24,26 +28,25 @@ function appId(win) {
         Shell.WindowTracker.get_default().get_window_app(win)?.get_id()?.replace(/\.desktop$/, '') || '';
 }
 
-// Connector names (DP-1, HDMI-A-1, ...) by monitor index, from the names in /sys/class/drm.
-function connectorsByIndex() {
+// Calls back with {monitor index: [connector, serial]}, from Mutter's own list of monitors.
+function readMonitors(callback) {
     const manager = global.backend.get_monitor_manager();
-    const result = {};
-    try {
-        const dir = Gio.File.new_for_path('/sys/class/drm');
-        const files = dir.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
-        let info;
-        while ((info = files.next_file(null))) {
-            const m = info.get_name().match(/^card\d+-(.+)$/);
-            if (!m)
-                continue;
-            const index = manager.get_monitor_for_connector(m[1]);
-            if (index >= 0)
-                result[index] = m[1];
-        }
-    } catch (e) {
-        console.warn(`naga: cannot list monitor connectors: ${e.message}`);
-    }
-    return result;
+    Gio.DBus.session.call('org.gnome.Mutter.DisplayConfig', '/org/gnome/Mutter/DisplayConfig',
+        'org.gnome.Mutter.DisplayConfig', 'GetCurrentState', null, null, Gio.DBusCallFlags.NONE, -1, null,
+        (conn, res) => {
+            const result = {};
+            try {
+                const [, monitors] = conn.call_finish(res).deepUnpack();
+                for (const [[connector, , , serial]] of monitors) {
+                    const index = manager.get_monitor_for_connector(connector);
+                    if (index >= 0)
+                        result[index] = [connector, serial];
+                }
+            } catch (e) {
+                console.warn(`naga: cannot list monitors: ${e.message}`);
+            }
+            callback(result);
+        });
 }
 
 export default class NagaExtension extends Extension {
@@ -51,11 +54,15 @@ export default class NagaExtension extends Extension {
         this._dbus = Gio.DBusExportedObject.wrapJSObject(IFACE, this);
         this._dbus.export(Gio.DBus.session, PATH);
         this._nameId = Gio.bus_own_name_on_connection(Gio.DBus.session, NAME, Gio.BusNameOwnerFlags.NONE, null, null);
-        this._connectors = connectorsByIndex();
-        this._monitorsId = global.backend.get_monitor_manager().connect('monitors-changed',
-            () => { this._connectors = connectorsByIndex(); });
-        this._focusId = global.display.connect('notify::focus-window', () => this._emit());
+        this._monitors = {};
         this._last = null;
+        const refresh = () => readMonitors(monitors => {
+            this._monitors = monitors;
+            this._emit();
+        });
+        refresh();
+        this._monitorsId = global.backend.get_monitor_manager().connect('monitors-changed', refresh);
+        this._focusId = global.display.connect('notify::focus-window', () => this._emit());
     }
 
     disable() {
@@ -69,16 +76,19 @@ export default class NagaExtension extends Extension {
     _focused() {
         const win = global.display.focus_window;
         if (!win)
-            return ['', ''];
-        return [appId(win), this._connectors[win.get_monitor()] ?? ''];
+            return ['', '', ''];
+        const [connector, serial] = this._monitors[win.get_monitor()] ?? ['', ''];
+        return [appId(win), connector, serial];
     }
 
     _emit() {
+        if (!this._dbus)
+            return;   // disabled while Mutter was answering
         const now = this._focused();
-        if (this._last && now[0] === this._last[0] && now[1] === this._last[1])
+        if (this._last && now.every((value, i) => value === this._last[i]))
             return;
         this._last = now;
-        this._dbus.emit_signal('FocusChanged', new GLib.Variant('(ss)', now));
+        this._dbus.emit_signal('FocusChanged', new GLib.Variant('(sss)', now));
     }
 
     Focused() {

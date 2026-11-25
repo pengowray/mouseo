@@ -8,7 +8,7 @@ log = logging.getLogger(__name__)
 class CosmicFocus:
     """Follows the focused window's app_id through a long-running `cos-cli serve`."""
 
-    missing = ''   # why the focused window is unknown, for notifications; '' if nothing is wrong
+    missing = ''   # why the focused window is unknown, for the popup; '' if nothing is wrong
 
     def __init__(self):
         self.app_id = ''
@@ -30,6 +30,10 @@ class CosmicFocus:
                 log.warning('focus tracking failed: %s', err)
             self.app_id = ''
             await asyncio.sleep(3)
+
+    def query_monitor(self):
+        """The focused window's monitor as (output, serial number), asked fresh. COSMIC gives no serial."""
+        return self.query_output() or self.output, ''
 
     @staticmethod
     def query_output():
@@ -93,16 +97,16 @@ def gnome_call(method, *args):
 
 
 def parse_gnome_signal(line):
-    """(app_id, output) from a `gdbus monitor` FocusChanged line, else None.
+    """(app_id, output, monitor serial) from a `gdbus monitor` FocusChanged line, else None.
 
-    "/io/mouseo/Naga: io.mouseo.Naga.FocusChanged ('firefox', 'DP-1')"
+    "/io/mouseo/Naga: io.mouseo.Naga.FocusChanged ('firefox', 'DP-1', '304NTJJ4A468')"
     """
     marker = '.FocusChanged '
     if marker not in line:
         return None
     try:
-        app_id, output = ast.literal_eval(line.split(marker, 1)[1].strip())
-        return app_id, output
+        app_id, output, *serial = ast.literal_eval(line.split(marker, 1)[1].strip())
+        return app_id, output, (serial or [''])[0]   # an older extension sends no serial
     except (ValueError, SyntaxError, TypeError):
         return None
 
@@ -114,11 +118,12 @@ class GnomeFocus:
 
     def __init__(self):
         self.app_id = ''
-        self.output = ''   # connector of the focused window's monitor, e.g. 'DP-1'
+        self.output = ''   # connector of the focused window's monitor, e.g. 'DP-1' ('DP-0' under X11)
+        self.serial = ''   # serial number of that monitor
         self.missing = ''  # as CosmicFocus.missing
 
-    def set(self, app_id, output):
-        self.app_id, self.output = app_id, output
+    def set(self, app_id='', output='', serial=''):
+        self.app_id, self.output, self.serial = app_id, output, serial
 
     async def run(self):
         warned = False
@@ -132,10 +137,10 @@ class GnomeFocus:
                         self.set(*focused)
                     elif 'is owned by' in line:   # the extension started (or was already running)
                         self.missing = ''
-                        self.set(*(await asyncio.to_thread(gnome_call, 'Focused') or ('', '')))
+                        self.set(*(await asyncio.to_thread(gnome_call, 'Focused') or ()))
                         log.info('focus tracking through the GNOME extension naga@mouseo')
                     elif 'does not have an owner' in line:
-                        self.set('', '')
+                        self.set()
                         self.missing = self.NOT_RUNNING
                         if not warned:
                             log.warning('GNOME extension naga@mouseo is not running: per-app keys use the '
@@ -145,14 +150,13 @@ class GnomeFocus:
                 log.warning('gdbus monitor exited with code %s', await proc.wait())
             except OSError as err:
                 log.warning('focus tracking failed: %s', err)
-            self.set('', '')
+            self.set()
             await asyncio.sleep(3)
 
-    @staticmethod
-    def query_output():
-        """The focused window's output, asked fresh."""
+    def query_monitor(self):
+        """The focused window's monitor as (output, serial number), asked fresh."""
         reply = gnome_call('Focused')
-        return reply[1] if reply else ''
+        return (reply[1], reply[2] if len(reply) > 2 else '') if reply else (self.output, self.serial)
 
     @staticmethod
     def set_on_top(on):

@@ -18,7 +18,7 @@ READ = (BRIGHTNESS, COLOUR_PRESET, *GAINS)
 
 @dataclass
 class Monitor:
-    connector: str          # 'DP-1', as COSMIC names the output
+    connector: str          # 'DP-1', the kernel's (DRM) name for the output, which COSMIC also uses
     bus: int                # /dev/i2c-N
     model: str              # 'LG ULTRAGEAR'
     serial: str
@@ -105,11 +105,14 @@ class MonitorWorker(threading.Thread):
         self.ready = threading.Event()
         self.start()
 
-    def find(self, connector):
-        """The monitor on a COSMIC output name, or the first monitor. None until detection finishes."""
+    def find(self, connector, serial=''):
+        """The monitor with this serial number, else on this output name ('DP-1'), else the first monitor.
+        None until detection finishes."""
         if not self.ready.is_set():
             return None
-        return next((m for m in self.monitors if m.connector == connector), self.monitors[0] if self.monitors else None)
+        return (next((m for m in self.monitors if serial and m.serial == serial), None)
+                or next((m for m in self.monitors if m.connector == connector), None)
+                or (self.monitors[0] if self.monitors else None))
 
     def refresh(self, monitor=None):
         with self.lock:

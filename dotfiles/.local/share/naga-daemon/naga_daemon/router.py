@@ -1,5 +1,8 @@
+import logging
 from evdev import ecodes as e
-from .keys import REDIRECTABLE, TILT_RIGHT
+from .keys import REDIRECTABLE, TILT_RIGHT, key_name
+
+log = logging.getLogger(__name__)
 
 
 class Router:
@@ -26,6 +29,7 @@ class Router:
 
         if control and ev.type == e.EV_KEY and ev.value == 1:
             self.used = True  # pressing anything else during a hold means it wasn't a tap
+            log.debug('%s pressed while holding %s', key_name(ev.code), key_name(self.held))
 
         if control and ev.type == e.EV_REL:
             if ev.code == e.REL_WHEEL:

@@ -1,8 +1,8 @@
 """Notices when the PC goes to sleep and wakes up, through logind's PrepareForSleep signal.
 
 After a wake the volume pie stopped appearing: it still got its messages but drew nothing,
-while a freshly started pie worked. So __main__ stops the pie around sleep, and the next press
-of thumb 5 starts a new one.
+while a freshly started pie worked. So __main__ stops the overlay process around sleep, and the
+next popup or press of thumb 5 starts a new one.
 """
 import asyncio, logging, subprocess
 
