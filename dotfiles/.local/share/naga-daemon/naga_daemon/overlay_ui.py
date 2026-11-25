@@ -6,7 +6,7 @@ on stdin and writes the hovered slot to stdout:
   in:  {"op": "open", "slots": {"0": {"label", "icons", "level", "note", "streams"}, ...}, "centre": {...}}
        {"op": "level", "slot": 0 | null, "level": 40}
        {"op": "close"}
-       {"op": "popup", "title": "DPI", "text": "800", "level": 0.25 | null}
+       {"op": "popup", "title": "DPI", "text": "800", "level": 0.25 | null, "ms": 1500 | null}
   out: {"hover": 0 | null}      null means the centre (system volume)
 
 Pie slots are the eight directions, clockwise from up: 0 up, 2 right, 4 down, 6 left.
@@ -44,7 +44,7 @@ FRAME_MS = 33
 
 POPUP_W, POPUP_H = 300, 86
 POPUP_BOTTOM = 120  # gap below the popup, in pixels
-POPUP_MS = 1500     # how long the popup stays after the last change
+POPUP_MS = 1500     # how long the popup stays after the last change, unless the message says
 
 
 def slot_at(dx, dy):
@@ -321,10 +321,10 @@ class Popup:
         return w
 
     def command(self, msg):
-        self.show(msg.get('title', ''), msg.get('text', ''), msg.get('level'))
+        self.show(msg.get('title', ''), msg.get('text', ''), msg.get('level'), msg.get('ms') or POPUP_MS)
         return False
 
-    def show(self, title, text, level):
+    def show(self, title, text, level, ms=POPUP_MS):
         self.title, self.text, self.level = title, text, level
         if self.window is None:
             self.window = self.make_window()
@@ -337,7 +337,7 @@ class Popup:
         self.window.queue_draw()
         if self.hide_timer is not None:
             GLib.source_remove(self.hide_timer)
-        self.hide_timer = GLib.timeout_add(POPUP_MS, self.hide)
+        self.hide_timer = GLib.timeout_add(ms, self.hide)
 
     def hide(self):
         self.hide_timer = None

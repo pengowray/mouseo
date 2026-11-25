@@ -13,6 +13,7 @@ from .pie import PieControl
 from .profiles import Profiles
 from .router import Router
 from .sleep import SleepWatch
+from .stuck import StuckTilts
 
 log = logging.getLogger('naga_daemon')
 CONFIG = os.environ.get('NAGA_CONFIG') or os.path.expanduser('~/.config/naga/config.toml')
@@ -79,6 +80,17 @@ async def main():
         if overlay.stop():
             log.info('%s: stopped the overlay; the next popup or press of thumb 5 starts a new one', 'going to sleep' if sleeping else 'woke up')
     asyncio.create_task(SleepWatch(on_sleep).run())
+
+    def on_stuck(code):
+        if code == keys.TILT_RIGHT and router.push_to_talk:
+            router.push_to_talk(0)
+            title = 'Tilt right stuck: push to talk off'
+        else:
+            title = f'Wheel tilt {"right" if code == keys.TILT_RIGHT else "left"} stuck'
+        log.warning('%s: the mouse has reported %s held for minutes; turning it off and on fixes it',
+                    title, keys.key_name(code))
+        overlay.show(title, 'Turn the mouse off and on', seconds=10)
+    asyncio.create_task(StuckTilts(devices, on_stuck).run())
     done, _ = await asyncio.wait(readers, return_when=asyncio.FIRST_COMPLETED)
     for task in done:
         task.result()  # raises if a device disappeared

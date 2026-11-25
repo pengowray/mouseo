@@ -77,6 +77,8 @@ class Overlay:
         self.hover = None
         self.send({'op': 'close'})
 
-    def show(self, title, text, level=None):
-        """The popup: a title, a value, and a bar filled to `level` (0 to 1) if given."""
-        self.send({'op': 'popup', 'title': title, 'text': text, 'level': level})
+    def show(self, title, text, level=None, seconds=None):
+        """The popup: a title, a value, and a bar filled to `level` (0 to 1) if given.
+        It stays for `seconds` after the last call, or 1.5 s."""
+        self.send({'op': 'popup', 'title': title, 'text': text, 'level': level,
+                   'ms': round(seconds * 1000) if seconds else None})
