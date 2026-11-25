@@ -9,7 +9,7 @@ log = logging.getLogger(__name__)
 class Gnome:
     name = 'gnome'
     overlay_env = {'GDK_BACKEND': 'x11'}   # Mutter has no layer shell; X11 popup windows sit above everything
-    ZOOM_STEP = 1.25                   # magnifier factor per wheel step
+    ZOOM_STEP = 1.15                   # magnifier factor per wheel step
     ZOOM_MAX = 32.0
 
     def __init__(self, output):

@@ -1,8 +1,13 @@
-// D-Bus service for naga-daemon on GNOME, which has no other way to tell a Wayland client
-// which window is focused. Bus name and object: io.mouseo.Naga at /io/mouseo/Naga.
+// Helper for naga-daemon on GNOME:
+// - A D-Bus service (io.mouseo.Naga at /io/mouseo/Naga) that says which window is focused, since
+//   GNOME has no other way to tell a Wayland client, and keeps a window on top when asked.
+// - Screen zoom (the GNOME magnifier) covers only the monitor under the pointer, as on COSMIC,
+//   instead of the whole desktop across all monitors.
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as PointerWatcher from 'resource:///org/gnome/shell/ui/pointerWatcher.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const NAME = 'io.mouseo.Naga';
@@ -49,6 +54,64 @@ function readMonitors(callback) {
         });
 }
 
+// Like the magnifier's own proportional mouse tracking, but relative to the zoomed monitor rather
+// than the whole desktop, so the zoomed view stays on that monitor's contents.
+function centerOnMonitor(xPoint, yPoint) {
+    const [, , widthRoi, heightRoi] = this.getROI();
+    const x0 = this._viewPortX, y0 = this._viewPortY;
+    const halfWidth = this._viewPortWidth / 2, halfHeight = this._viewPortHeight / 2;
+    const x = Math.min(Math.max(xPoint, x0), x0 + 2 * halfWidth);
+    const y = Math.min(Math.max(yPoint, y0), y0 + 2 * halfHeight);
+    const padding = Math.min(this._viewPortWidth, this._viewPortHeight) / 5;
+    const xProportion = (x - x0 - halfWidth) / halfWidth;     // -1 ... 1
+    const yProportion = (y - y0 - halfHeight) / halfHeight;
+    return [x - xProportion * (widthRoi / 2 - padding / this._xMagFactor),
+        y - yProportion * (heightRoi / 2 - padding / this._yMagFactor)];
+}
+
+// Keeps the magnifier's zoomed view on the monitor under the pointer while zoom is on.
+class OneMonitorZoom {
+    constructor() {
+        this._watch = null;
+        this._region = Main.magnifier?.getZoomRegions()[0] ?? null;
+        if (!this._region)
+            return;
+        this._region._centerFromPointProportional = centerOnMonitor;
+        Main.magnifier.connectObject('active-changed', (_, active) => this._sync(active), this);
+        this._sync(Main.magnifier.isActive());
+    }
+
+    _sync(active) {
+        if (active && !this._watch) {
+            this._watch = PointerWatcher.getPointerWatcher().addWatch(50, (x, y) => this._follow(x, y));
+            const [x, y] = global.get_pointer();
+            this._follow(x, y);
+        } else if (!active && this._watch) {
+            this._watch.remove();
+            this._watch = null;
+        }
+    }
+
+    _follow(x, y) {
+        const m = Main.layoutManager.findMonitorForPoint(x, y);
+        const r = this._region;
+        if (m && (r._viewPortX !== m.x || r._viewPortY !== m.y ||
+                  r._viewPortWidth !== m.width || r._viewPortHeight !== m.height))
+            r.setViewPort({x: m.x, y: m.y, width: m.width, height: m.height});
+    }
+
+    destroy() {
+        if (!this._region)
+            return;
+        this._sync(false);
+        Main.magnifier.disconnectObject(this);
+        delete this._region._centerFromPointProportional;   // back to the prototype's
+        const full = {x: 0, y: 0, width: global.screen_width, height: global.screen_height};
+        this._region.setViewPort(full);
+        this._region = null;
+    }
+}
+
 export default class NagaExtension extends Extension {
     enable() {
         this._dbus = Gio.DBusExportedObject.wrapJSObject(IFACE, this);
@@ -63,9 +126,12 @@ export default class NagaExtension extends Extension {
         refresh();
         this._monitorsId = global.backend.get_monitor_manager().connect('monitors-changed', refresh);
         this._focusId = global.display.connect('notify::focus-window', () => this._emit());
+        this._zoom = new OneMonitorZoom();
     }
 
     disable() {
+        this._zoom.destroy();
+        this._zoom = null;
         global.display.disconnect(this._focusId);
         global.backend.get_monitor_manager().disconnect(this._monitorsId);
         Gio.bus_unown_name(this._nameId);
